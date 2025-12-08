@@ -6,6 +6,7 @@ from mpi4py import MPI
 import h5py
 from utils.function_tools import eval_function
 
+
 def load_geometry_data(file_path):
     """Load geometry data from an HDF5 file."""
     try:
@@ -16,11 +17,13 @@ def load_geometry_data(file_path):
     except Exception as e:
         raise RuntimeError(f"Failed to load geometry data: {e}")
 
+
 def create_function_space(mesh, cell_markers, marker_value):
     """Create a function space for a specific subdomain."""
     tdim = mesh.topology.dim
     subdomain, _, _, _ = create_submesh(mesh, tdim, cell_markers.find(marker_value))
     return functionspace(subdomain, ("Lagrange", 1))
+
 
 def compute_surface_potentials(v_data, function_space, eval_points):
     """Compute surface potentials for given data and evaluation points."""
@@ -33,6 +36,7 @@ def compute_surface_potentials(v_data, function_space, eval_points):
         v_data_ecgsim.append(v_surface.copy())
 
     return np.array(v_data_ecgsim)
+
 
 def forward_tmp(case_name, v_data):
     """Perform forward computation to map heart potentials to body potentials."""
@@ -54,6 +58,7 @@ def forward_tmp(case_name, v_data):
     d_data_ecgsim = v_data_ecgsim @ forward_matrix
 
     return d_data_ecgsim
+
 
 def compute_d_from_tmp(case_name, v_data):
     """Wrapper function to compute body potentials from heart potentials."""

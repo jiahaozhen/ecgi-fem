@@ -8,9 +8,10 @@ from mpi4py import MPI
 import h5py
 from utils.simulate_tools import build_Mi, build_M
 
-def build_forward_matrix_coupled(case_name,
-                                 sigma_i=0.4, sigma_e=0.8, sigma_t=0.8,
-                                 multi_flag=True, gdim=3):
+
+def build_forward_matrix_coupled(
+    case_name, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_flag=True, gdim=3
+):
     """
     Build transfer matrix M_transfer: (n_targets, ndofs_V2)
     Solves A u = -R[:, i] for each basis i of V2, then samples u at closest torso points.
@@ -21,18 +22,27 @@ def build_forward_matrix_coupled(case_name,
     tdim = domain.topology.dim
 
     # submesh of ventricles: cell marker 2 assumed (same as original)
-    subdomain_ventricle, ventricle_to_torso, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
+    subdomain_ventricle, ventricle_to_torso, _, _ = create_submesh(
+        domain, tdim, cell_markers.find(2)
+    )
 
     V1 = functionspace(domain, ("Lagrange", 1))
     V2 = functionspace(subdomain_ventricle, ("Lagrange", 1))
 
-    Mi = build_Mi(subdomain_ventricle, condition=None, sigma_i=sigma_i,
-                  scar=False,
-                  ischemia=False)
-    M = build_M(domain, cell_markers, multi_flag=multi_flag, condition=None,
-                sigma_i=sigma_i, sigma_e=sigma_e, sigma_t=sigma_t,
-                scar=False,
-                ischemia=False)
+    Mi = build_Mi(
+        subdomain_ventricle, condition=None, sigma_i=sigma_i, scar=False, ischemia=False
+    )
+    M = build_M(
+        domain,
+        cell_markers,
+        multi_flag=multi_flag,
+        condition=None,
+        sigma_i=sigma_i,
+        sigma_e=sigma_e,
+        sigma_t=sigma_t,
+        scar=False,
+        ischemia=False,
+    )
 
     # ------------- assemble A and R -------------
     u1 = TrialFunction(V1)
@@ -64,6 +74,7 @@ def build_forward_matrix_coupled(case_name,
         R_mat = R
 
     from petsc4py import PETSc
+
     nullspace = PETSc.NullSpace().create(constant=True, comm=MPI.COMM_WORLD)
     A_mat.setNullSpace(nullspace)
 
@@ -80,11 +91,16 @@ def build_forward_matrix_coupled(case_name,
     f_space_pts = V1.tabulate_dof_coordinates()
     f_space_pts = np.asarray(f_space_pts, dtype=float)
     # many dolfinx returns shape (ndofs, gdim) already; if it's (gdim, ndofs) transpose
-    if f_space_pts.ndim == 2 and f_space_pts.shape[0] == 3 and f_space_pts.shape[1] != 3:
+    if (
+        f_space_pts.ndim == 2
+        and f_space_pts.shape[0] == 3
+        and f_space_pts.shape[1] != 3
+    ):
         f_space_pts = f_space_pts.T
 
     # compute nearest torso dof for each target electrode
     from scipy.spatial.distance import cdist
+
     dists = cdist(target_pts, f_space_pts)  # shape: (ntargets, ndofs_V1)
     closest_indices = np.argmin(dists, axis=1)  # (ntargets,)
 
@@ -94,7 +110,9 @@ def build_forward_matrix_coupled(case_name,
     try:
         ai, aj, av = A_mat.getValuesCSR()  # ai, aj 以 petsc 的 CSR 表示 (ia, ja, a)
     except Exception as e:
-        raise RuntimeError("无法从 A_mat 获取 CSR。请确保 A 是稀疏 AIJ 矩阵。错误: " + str(e))
+        raise RuntimeError(
+            "无法从 A_mat 获取 CSR。请确保 A 是稀疏 AIJ 矩阵。错误: " + str(e)
+        )
 
     # PETSc 返回的 ai 是 row pointers 长度 nrows+1
     nrows = A_mat.getSize()[0]
@@ -106,7 +124,9 @@ def build_forward_matrix_coupled(case_name,
 
     # 如果 A 非对称或奇异需额外处理；你原来设置了 nullspace，确保 rhs 已正交到 nullspace
     # LU 因式分解（可能占用内存，视矩阵稀疏结构而定）
-    lu = spla.splu(A_csc)  # 若内存不足或矩阵巨大，这一步会失败 -> 改用并行 direct solver (见注)
+    lu = spla.splu(
+        A_csc
+    )  # 若内存不足或矩阵巨大，这一步会失败 -> 改用并行 direct solver (见注)
 
     # ---- 获取 R 的全部列（或分块读取以节省内存） ----
     # 理想：一次性把 R 写成稠密数组 cols_count = ndofs_V2
@@ -169,9 +189,16 @@ def build_forward_matrix_coupled(case_name,
     return M_transfer
 
 
-def forward_tmp(case_name, v_data,
-                sigma_i=0.4, sigma_e=0.8, sigma_t=0.8,
-                multi_flag=True, gdim=3, allow_cache=True):
+def forward_tmp(
+    case_name,
+    v_data,
+    sigma_i=0.4,
+    sigma_e=0.8,
+    sigma_t=0.8,
+    multi_flag=True,
+    gdim=3,
+    allow_cache=True,
+):
     """
     Use the transfer matrix A (300 x N_heart) to compute BSP (300 x T) for given v_data.
     v_data may be:
@@ -179,17 +206,25 @@ def forward_tmp(case_name, v_data,
       - 2D array (N_nodes, T)
       - 2D array (T, N_nodes) -> transposed automatically
     """
-    file_path = 'forward_inverse_3d/data/forward_matrix/forward_matrix_coupled_' + case_name + '.npz'
+    file_path = (
+        'forward_inverse_3d/data/forward_matrix/forward_matrix_coupled_'
+        + case_name
+        + '.npz'
+    )
     try:
         if not allow_cache:
             raise FileNotFoundError
         import os
+
         if not os.path.exists(file_path):
             raise FileNotFoundError
         data = np.load(file_path)
         A_transfer_matrix = data['A']
     except FileNotFoundError:
-        print(f"Precomputed forward matrix not found at {file_path}, building anew...", flush=True)
+        print(
+            f"Precomputed forward matrix not found at {file_path}, building anew...",
+            flush=True,
+        )
 
         A_transfer_matrix = build_forward_matrix_coupled(
             case_name,
@@ -197,13 +232,13 @@ def forward_tmp(case_name, v_data,
             sigma_e=sigma_e,
             sigma_t=sigma_t,
             multi_flag=multi_flag,
-            gdim=gdim
+            gdim=gdim,
         )
 
         if allow_cache:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             np.savez(file_path, A=A_transfer_matrix)
-    
+
     A = np.asarray(A_transfer_matrix, dtype=float)  # (300, N_nodes)
 
     # make v into (N_nodes, T)
@@ -225,7 +260,9 @@ def forward_tmp(case_name, v_data,
             v = v.T
         else:
             # ambiguous shape
-            raise ValueError(f"无法识别 v 的形状 {v.shape}，应为 (N_nodes, T) 或 (T, N_nodes)，其中 N_nodes={A.shape[1]}.")
+            raise ValueError(
+                f"无法识别 v 的形状 {v.shape}，应为 (N_nodes, T) 或 (T, N_nodes)，其中 N_nodes={A.shape[1]}."
+            )
     else:
         raise ValueError("v_data 必须是一维或二维数组。")
 
@@ -246,12 +283,25 @@ def forward_tmp(case_name, v_data,
     return phi_body
 
 
-def compute_d_from_tmp(case_name, v_data,
-                       sigma_i=0.4, sigma_e=0.8, sigma_t=0.8,
-                       multi_flag=True, gdim=3,
-                       allow_cache=False):
-    d_data = forward_tmp(case_name, v_data,
-                         sigma_i=sigma_i, sigma_e=sigma_e, sigma_t=sigma_t,
-                         multi_flag=multi_flag, gdim=gdim, allow_cache=allow_cache)
+def compute_d_from_tmp(
+    case_name,
+    v_data,
+    sigma_i=0.4,
+    sigma_e=0.8,
+    sigma_t=0.8,
+    multi_flag=True,
+    gdim=3,
+    allow_cache=False,
+):
+    d_data = forward_tmp(
+        case_name,
+        v_data,
+        sigma_i=sigma_i,
+        sigma_e=sigma_e,
+        sigma_t=sigma_t,
+        multi_flag=multi_flag,
+        gdim=gdim,
+        allow_cache=allow_cache,
+    )
     # your original function returns transposed
     return d_data.T

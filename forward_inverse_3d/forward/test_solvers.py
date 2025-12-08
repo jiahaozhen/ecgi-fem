@@ -1,10 +1,13 @@
 import time
 import numpy as np
 from forward_inverse_3d.forward.forward_coupled_ischemia import forward_tmp
-from forward_inverse_3d.reaction_diffusion.simulate_reaction_diffusion import compute_v_based_on_reaction_diffusion
+from forward_inverse_3d.reaction_diffusion.simulate_reaction_diffusion import (
+    compute_v_based_on_reaction_diffusion,
+)
 from petsc4py import PETSc
 import matplotlib.pyplot as plt
 from utils.signal_processing_tools import transfer_bsp_to_standard12lead
+
 
 def test_different_solvers(mesh_file, v_data, solver_configs=None):
     """
@@ -24,7 +27,7 @@ def test_different_solvers(mesh_file, v_data, solver_configs=None):
             {'type': 'cg', 'pc': 'hypre'},
             {'type': 'cg', 'pc': 'ilu'},
             {'type': 'gmres', 'pc': 'ilu'},
-            {'type': 'cg', 'pc': 'gamg'}
+            {'type': 'cg', 'pc': 'gamg'},
         ]
 
     results = {}
@@ -50,20 +53,21 @@ def test_different_solvers(mesh_file, v_data, solver_configs=None):
             # 保存结果
             results[f"{solver_type}_{pc_type}"] = {
                 'time': elapsed_time,
-                'd_data': d_data
+                'd_data': d_data,
             }
 
-            print(f"Solver {solver_type} with PC {pc_type} completed in {elapsed_time:.2f} seconds.")
+            print(
+                f"Solver {solver_type} with PC {pc_type} completed in {elapsed_time:.2f} seconds."
+            )
         except Exception as e:
             print(f"Solver {solver_type} with PC {pc_type} failed: {e}")
-            results[f"{solver_type}_{pc_type}"] = {
-                'time': None,
-                'error': str(e)
-            }
+            results[f"{solver_type}_{pc_type}"] = {'time': None, 'error': str(e)}
 
     # 比较结果差异
     base_solver = list(results.keys())[0]
-    base_data = results[base_solver]['d_data'] if 'd_data' in results[base_solver] else None
+    base_data = (
+        results[base_solver]['d_data'] if 'd_data' in results[base_solver] else None
+    )
 
     for solver_key, data in results.items():
         if solver_key != base_solver and 'd_data' in data:
@@ -72,6 +76,7 @@ def test_different_solvers(mesh_file, v_data, solver_configs=None):
             print(f"Difference between {base_solver} and {solver_key}: {diff:.6f}")
 
     return results
+
 
 def plot_12_lead_comparison(results, lead_indices):
     """
@@ -87,7 +92,9 @@ def plot_12_lead_comparison(results, lead_indices):
         plt.subplot(4, 3, i + 1)
         for solver, data in results.items():
             if 'd_data' in data:
-                lead_data = transfer_bsp_to_standard12lead(data['d_data'], lead_indices)[:, i]
+                lead_data = transfer_bsp_to_standard12lead(
+                    data['d_data'], lead_indices
+                )[:, i]
                 plt.plot(lead_data, label=f"Solver: {solver}")
 
         plt.title(f"Lead {i + 1}")
@@ -100,21 +107,26 @@ def plot_12_lead_comparison(results, lead_indices):
     plt.tight_layout()
     plt.show()
 
+
 if __name__ == "__main__":
     mesh_file = r'forward_inverse_3d/data/mesh_multi_conduct_ecgsim.msh'
     T = 500
     lead_indices = np.array([19, 26, 65, 41, 48, 54, 1, 2, 66]) - 1  # 12 导联索引
 
-    v_data, _, _ = compute_v_based_on_reaction_diffusion(mesh_file, T=T, step_per_timeframe=2)
+    v_data, _, _ = compute_v_based_on_reaction_diffusion(
+        mesh_file, T=T, step_per_timeframe=2
+    )
 
     solver_configs = [
-            {'type': 'cg', 'pc': 'hypre'},
-            {'type': 'cg', 'pc': 'ilu'},
-            {'type': 'gmres', 'pc': 'ilu'},
-            {'type': 'cg', 'pc': 'gamg'},
-            {'type': 'preonly', 'pc': 'ilu'}
-        ]
-    solver_results = test_different_solvers(mesh_file, v_data, solver_configs=solver_configs)
+        {'type': 'cg', 'pc': 'hypre'},
+        {'type': 'cg', 'pc': 'ilu'},
+        {'type': 'gmres', 'pc': 'ilu'},
+        {'type': 'cg', 'pc': 'gamg'},
+        {'type': 'preonly', 'pc': 'ilu'},
+    ]
+    solver_results = test_different_solvers(
+        mesh_file, v_data, solver_configs=solver_configs
+    )
 
     # 绘制 12 导联比较图
     plot_12_lead_comparison(solver_results, lead_indices)

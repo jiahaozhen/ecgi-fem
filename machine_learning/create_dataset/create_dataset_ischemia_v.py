@@ -41,7 +41,7 @@ def generate_ischemia_data(
 
     activation_dict = get_activation_dict(mesh_file, mode='ENDO', threshold=40)
 
-    segment_ids, _, _ = lv_17_segmentation_from_mesh(mesh_file, gdim=gdim)
+    segment_ids = lv_17_segmentation_from_mesh(mesh_file, gdim=gdim)
     domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
     tdim = domain.topology.dim
     subdomain_ventricle, _, _, _ = create_submesh(domain, tdim, cell_markers.find(2))

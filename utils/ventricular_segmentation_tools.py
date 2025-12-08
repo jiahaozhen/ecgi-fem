@@ -6,19 +6,21 @@ from scipy.spatial import cKDTree
 
 from .helper_function import submesh_node_index, get_boundary_vertex_connectivity
 
+
 def distinguish_epi_endo(mesh_file: str, gdim: int) -> np.ndarray:
     """
     Distinguish epi and endo based on the mesh file.
-    
+
     Parameters:
     - mesh_file: Path to the mesh file.
-    
+
     Returns:
     - epi_endo_marker: Array with 1 for epi and -1 for endo.
     """
     marker = distinguish_left_right_endo_epi(mesh_file, gdim)
-    epi_endo_marker = np.where(marker==-2, -1, marker)
+    epi_endo_marker = np.where(marker == -2, -1, marker)
     return epi_endo_marker.astype(np.int32)
+
 
 def distinguish_left_right_endo_epi(mesh_file: str, gdim: int) -> np.ndarray:
     # mesh of Body
@@ -38,21 +40,34 @@ def distinguish_left_right_endo_epi(mesh_file: str, gdim: int) -> np.ndarray:
 
     left_cavity_sub2parent = submesh_node_index(domain, cell_markers, 5)
     right_cavity_sub2parent = submesh_node_index(domain, cell_markers, 6)
-    ventricle_boundary = locate_entities_boundary(subdomain_ventricle, tdim-3, lambda x: np.full(x.shape[1], True, dtype=bool))
-    left_cavity_boundary = locate_entities_boundary(subdomain_left_cavity, tdim-3, lambda x: np.full(x.shape[1], True, dtype=bool))
-    right_cavity_boundary = locate_entities_boundary(subdomain_right_cavity, tdim-3, lambda x: np.full(x.shape[1], True, dtype=bool))
+    ventricle_boundary = locate_entities_boundary(
+        subdomain_ventricle, tdim - 3, lambda x: np.full(x.shape[1], True, dtype=bool)
+    )
+    left_cavity_boundary = locate_entities_boundary(
+        subdomain_left_cavity, tdim - 3, lambda x: np.full(x.shape[1], True, dtype=bool)
+    )
+    right_cavity_boundary = locate_entities_boundary(
+        subdomain_right_cavity,
+        tdim - 3,
+        lambda x: np.full(x.shape[1], True, dtype=bool),
+    )
 
     marker[ventricle_boundary] = 1
     for i in range(len(left_cavity_boundary)):
-        node_index_in_ventricle = ventricle_parent2sub[left_cavity_sub2parent[left_cavity_boundary[i]]]
+        node_index_in_ventricle = ventricle_parent2sub[
+            left_cavity_sub2parent[left_cavity_boundary[i]]
+        ]
         if node_index_in_ventricle != -1:
             marker[node_index_in_ventricle] = -1
     for i in range(len(right_cavity_boundary)):
-        node_index_in_ventricle = ventricle_parent2sub[right_cavity_sub2parent[right_cavity_boundary[i]]]
+        node_index_in_ventricle = ventricle_parent2sub[
+            right_cavity_sub2parent[right_cavity_boundary[i]]
+        ]
         if node_index_in_ventricle != -1:
             marker[node_index_in_ventricle] = -2
-    
+
     return marker.astype(np.int32)
+
 
 def get_ring_pts(mesh_file: str, gdim: int) -> tuple[np.ndarray, np.ndarray]:
     domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
@@ -82,6 +97,7 @@ def get_ring_pts(mesh_file: str, gdim: int) -> tuple[np.ndarray, np.ndarray]:
     ring_points = points[ring_point_index]
 
     return left_point_index, ring_point_index, left_points, ring_points
+
 
 def separate_lv_rv(mesh_file, gdim=3):
 
@@ -125,6 +141,7 @@ def separate_lv_rv(mesh_file, gdim=3):
 
     return ventricle_pts[lv_mask], ventricle_pts[rv_mask], lv_mask, rv_mask
 
+
 def get_apex_from_annulus_pts(vertices, annulus_pts):
     V = np.asarray(vertices)
     annulus = np.asarray(annulus_pts)
@@ -140,14 +157,49 @@ def get_apex_from_annulus_pts(vertices, annulus_pts):
 
     return apex
 
+
+def compute_v1_v2(left_ring_pts: np.ndarray, right_ring_pts: np.ndarray, axis):
+
+    v1 = left_ring_pts.mean(axis=0) - right_ring_pts.mean(axis=0)
+    # 投影到短轴平面：去掉 axis 分量
+    v1 -= np.dot(v1, axis) * axis
+    v1 /= np.linalg.norm(v1)
+
+    # ---- v2: 与 v1 正交，通过叉乘得到 ----
+    v2 = np.cross(axis, v1)
+    v2 /= np.linalg.norm(v2)
+
+    return v1, v2
+
+
+def compute_h_and_theta(points, center, axis, v1, v2):
+    """
+    points: Nx3 点列
+    center: annulus_center
+    axis:   LV 主轴(unit vector)
+    v1,v2:  短轴平面坐标系基向量（来自原方法）
+    """
+    vecs = points - center  # N×3
+
+    # ---- 高度 h ----
+    # 投影到主轴 axis
+    h = np.dot(vecs, axis)  # N,
+    h_norm = (h - h.min()) / (h.max() - h.min())
+
+    # ---- 角度 θ ----
+    x = np.dot(vecs, v1)  # v 在 v1 方向的投影
+    y = np.dot(vecs, v2)  # v 在 v2 方向的投影
+    theta = np.degrees(np.arctan2(y, x))
+
+    return h_norm, theta
+
+
 def compute_lv_axis(annulus_points, apex_point):
     annulus_center = annulus_points.mean(axis=0)
     axis = apex_point - annulus_center
     axis /= np.linalg.norm(axis)
     return annulus_center, axis
 
-def compute_lv_height_values(points, annulus_center, axis):
-    return np.dot(points - annulus_center, axis)
 
 def assign_segment(hi, theta_deg):
     if hi < 0.33:
@@ -166,39 +218,29 @@ def assign_segment(hi, theta_deg):
     seg = int(theta_deg / (360 / n_seg)) + offset
     return seg
 
-def lv_17_segmentation(lv_points, annulus_points, apex_point):
-    annulus_center, axis = compute_lv_axis(annulus_points, apex_point)
 
-    v1 = annulus_points[0] - annulus_center
-    v1 -= np.dot(v1, axis) * axis
-    v1 /= np.linalg.norm(v1)
-    v2 = np.cross(axis, v1)
+def lv_17_segmentation(lv_points, left_ring_pts, right_ring_pts, apex_point):
+    annulus_center, axis = compute_lv_axis(left_ring_pts, apex_point)
 
-    h_values = compute_lv_height_values(lv_points, annulus_center, axis)
-    h_min, h_max = h_values.min(), h_values.max()
-    h_norm = (h_values - h_min) / (h_max - h_min)
+    v1, v2 = compute_v1_v2(left_ring_pts, right_ring_pts, axis)
+
+    h_norm, theta_list = compute_h_and_theta(lv_points, annulus_center, axis, v1, v2)
 
     seg_ids = []
-    r_mapped = []
-    theta_mapped = []
-    for p, h in zip(lv_points, h_norm):
-        v = p - annulus_center
-        v /= np.linalg.norm(v)
-        v -= np.dot(v, axis) * axis
-        theta = np.degrees(np.arctan2(np.dot(v, v2), np.dot(v, v1)))
-        r_mapped.append(np.linalg.norm(v))
-        theta_mapped.append(theta)
+
+    for h, theta in zip(h_norm, theta_list):
         seg_ids.append(assign_segment(h, theta))
-    return np.array(seg_ids), np.array(r_mapped), np.array(theta_mapped)
+    return np.array(seg_ids)
+
 
 def lv_17_segmentation_from_mesh(mesh_file: str, gdim: int = 3) -> np.ndarray:
     """
     Perform 17-segment segmentation of the left ventricle based on the mesh file.
-    
+
     Parameters:
     - mesh_file: Path to the mesh file.
     - gdim: Geometric dimension of the mesh (default is 3).
-    
+
     Returns:
     - segment_ids: Array of segment IDs for each vertex in the left ventricle.
     """
@@ -206,21 +248,23 @@ def lv_17_segmentation_from_mesh(mesh_file: str, gdim: int = 3) -> np.ndarray:
     domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
     tdim = domain.topology.dim
     subdomain_ventricle, _, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
-    
+
     points = subdomain_ventricle.geometry.x
-    left_ring_index, ring_ring_index, left_ring_pts, right_ring_pts = get_ring_pts(mesh_file, gdim=gdim)
-    
-    lv_points, rv_points, lv_mask, rv_mask = separate_lv_rv(mesh_file, gdim=gdim)
-    
+    _, _, left_ring_pts, right_right_pts = get_ring_pts(mesh_file, gdim=gdim)
+
+    lv_points, _, lv_mask, rv_mask = separate_lv_rv(mesh_file, gdim=gdim)
+
     apex_point = get_apex_from_annulus_pts(lv_points, left_ring_pts)
-    
-    segment_ids_lv, r_mapped, theta_mapped = lv_17_segmentation(lv_points, left_ring_pts, apex_point)
-    
+
+    segment_ids_lv = lv_17_segmentation(
+        lv_points, left_ring_pts, right_right_pts, apex_point
+    )
+
     segment_ids = np.zeros(points.shape[0], dtype=np.int32)
     segment_ids[lv_mask] = segment_ids_lv
     segment_ids[rv_mask] = -1  # RV points marked as -1
-    
-    return segment_ids, r_mapped, theta_mapped
+
+    return segment_ids
 
 
 def get_IVS_region(mesh_file, gdim=3, threshold=2.0):
@@ -250,3 +294,69 @@ def get_IVS_region(mesh_file, gdim=3, threshold=2.0):
     ivs_mask = np.where(marker == 1, False, ivs_mask)
 
     return ivs_mask, ventricle_pts[ivs_mask], d_LV, d_RV
+
+
+def get_free_wall_region(
+    mesh_file, gdim, theta_min=-60, theta_max=60, h_min=0, h_max=1
+):
+    domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
+    tdim = domain.topology.dim
+    subdomain_ventricle, _, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
+
+    vertices_pts = subdomain_ventricle.geometry.x
+
+    _, _, left_ring_points, right_ring_points = get_ring_pts(mesh_file, gdim=gdim)
+
+    lv_points, rv_points, lv_mask, rv_mask = separate_lv_rv(mesh_file, gdim=gdim)
+
+    left_ring_points = np.asarray(left_ring_points)
+    right_ring_points = np.asarray(right_ring_points)
+
+    left_center = left_ring_points.mean(axis=0)
+    right_center = right_ring_points.mean(axis=0)
+
+    U, S, VT = np.linalg.svd(left_ring_points - left_center, full_matrices=False)
+    axis = VT[-1] / np.linalg.norm(VT[-1])
+
+    ventricle_center = vertices_pts.mean(axis=0)
+    if np.dot(axis, ventricle_center - left_center) < 0:
+        axis = -axis
+
+    v1, v2 = compute_v1_v2(left_ring_points, right_ring_points, axis)
+
+    left_h, left_theta = compute_h_and_theta(lv_points, left_center, axis, -v1, v2)
+
+    right_h, right_theta = compute_h_and_theta(rv_points, right_center, axis, v1, v2)
+
+    epi_endo_marker = distinguish_epi_endo(mesh_file, gdim)
+
+    # LV 自由壁区域
+    lv_region_mask = (
+        (left_theta >= theta_min)
+        & (left_theta <= theta_max)
+        & (left_h >= h_min)
+        & (left_h <= h_max)
+    )
+
+    # 去掉 LV 外膜点
+    lv_region_mask &= epi_endo_marker[lv_mask] != 1  # 若 0=endo / 1=epi
+
+    lv_freewall_pts = lv_points[lv_region_mask]
+
+    # ---------- RV 自由壁筛选 ----------
+    rv_region_mask = (
+        (right_theta >= theta_min)
+        & (right_theta <= theta_max)
+        & (right_h >= h_min)
+        & (right_h <= h_max)
+    )
+
+    # 去掉 RV 外膜点
+    rv_region_mask &= epi_endo_marker[rv_mask] != 1
+
+    rv_freewall_pts = rv_points[rv_region_mask]
+
+    # 合并
+    free_wall_pts = np.vstack([lv_freewall_pts, rv_freewall_pts])
+
+    return free_wall_pts

@@ -16,8 +16,17 @@ CAVITY_FACTOR = 3
 LUNG_FACTOR = 0.2
 
 
-class ischemia_condition():
-    def __init__(self, u_ischemia, u_healthy, center, r, marker_function, ischemia_epi_endo,sigma=3):
+class ischemia_condition:
+    def __init__(
+        self,
+        u_ischemia,
+        u_healthy,
+        center,
+        r,
+        marker_function,
+        ischemia_epi_endo,
+        sigma=3,
+    ):
         self.u_ischemia = u_ischemia
         self.u_healthy = u_healthy
         self.center = center
@@ -25,9 +34,10 @@ class ischemia_condition():
         self.sigma = sigma
         self.marker_function = marker_function
         self.ischemia_epi_endo = ischemia_epi_endo
+
     def __call__(self, x):
         marker_value = eval_function(self.marker_function, x.T).ravel()
-        distance = np.sqrt(np.sum((x.T - self.center)**2, axis=1))
+        distance = np.sqrt(np.sum((x.T - self.center) ** 2, axis=1))
 
         # 只在选定层参与缺血（如 -1,0,1）
         layer_mask = np.isin(marker_value.round(), self.ischemia_epi_endo)
@@ -49,29 +59,32 @@ class ischemia_condition():
 
         return ret_value
 
-def build_tau_close(marker_function: Function, 
-                    condition: ischemia_condition, 
-                    ischemia=False, 
-                    vary=False,
-                    tau_close_endo=155,
-                    tau_close_mid=150,
-                    tau_close_epi=145,
-                    tau_close_shift=20):
+
+def build_tau_close(
+    marker_function: Function,
+    condition: ischemia_condition,
+    ischemia=False,
+    vary=False,
+    tau_close_endo=155,
+    tau_close_mid=150,
+    tau_close_epi=145,
+    tau_close_shift=20,
+):
     f_space = marker_function.function_space
     tau_close = Function(f_space)
 
     if vary:
         marker_f = marker_function.x.array.round()
-        tau_close.x.array[:] = np.where(marker_f == MARKER_EPI,
-                                        tau_close_epi,
-                                        np.where(marker_f == MARKER_MID,
-                                                 tau_close_mid,
-                                                 tau_close_endo))
-        
+        tau_close.x.array[:] = np.where(
+            marker_f == MARKER_EPI,
+            tau_close_epi,
+            np.where(marker_f == MARKER_MID, tau_close_mid, tau_close_endo),
+        )
+
         # from utils.ventricular_segmentation_tools import separate_lv_rv
         # from utils.function_tools import fspace2mesh
         # _, _, _, rv_mask = separate_lv_rv(r"machine_learning/data/mesh/mesh_multi_conduct_ecgsim.msh",3)
-        
+
         # fspace2mesh_map = fspace2mesh(f_space)
         # mesh2fspace_map = np.argsort(fspace2mesh_map)
         # rv_idx = np.where(rv_mask)[0]
@@ -93,11 +106,13 @@ def build_tau_close(marker_function: Function,
     return tau_close
 
 
-def build_tau_in(f_space: FunctionSpace, 
-                 condition: ischemia_condition, 
-                 ischemia=False,
-                 tau_in_val=0.4,
-                 tau_in_ischemia=1):
+def build_tau_in(
+    f_space: FunctionSpace,
+    condition: ischemia_condition,
+    ischemia=False,
+    tau_in_val=0.4,
+    tau_in_ischemia=1,
+):
     tau_in = Function(f_space)
 
     if ischemia:
@@ -115,10 +130,15 @@ def build_tau_in(f_space: FunctionSpace,
     return tau_in
 
 
-def build_D(f_space: FunctionSpace, 
-            condition: ischemia_condition, 
-            scar=False, ischemia=False,
-            D_val=1e-1, D_val_ischemia=5e-2, D_val_scar=0):
+def build_D(
+    f_space: FunctionSpace,
+    condition: ischemia_condition,
+    scar=False,
+    ischemia=False,
+    D_val=1e-1,
+    D_val_ischemia=5e-2,
+    D_val_scar=0,
+):
     D = Function(f_space)
     coords = f_space.tabulate_dof_coordinates().T
 
@@ -141,10 +161,9 @@ def build_D(f_space: FunctionSpace,
     return D
 
 
-def build_Mi(domain: Mesh, 
-             condition: ischemia_condition, 
-             sigma_i=0.4, 
-             scar=False, ischemia=False):
+def build_Mi(
+    domain: Mesh, condition: ischemia_condition, sigma_i=0.4, scar=False, ischemia=False
+):
     tdim = domain.topology.dim
     f_space = functionspace(domain, ("DG", 0, (tdim, tdim)))
     coords = f_space.tabulate_dof_coordinates().T
@@ -168,10 +187,9 @@ def build_Mi(domain: Mesh,
     return Mi
 
 
-def build_Me(domain: Mesh, 
-             condition: ischemia_condition, 
-             sigma_e=0.8, 
-             scar=False, ischemia=False):
+def build_Me(
+    domain: Mesh, condition: ischemia_condition, sigma_e=0.8, scar=False, ischemia=False
+):
     tdim = domain.topology.dim
     f_space = functionspace(domain, ("DG", 0, (tdim, tdim)))
     coords = f_space.tabulate_dof_coordinates().T
@@ -195,11 +213,17 @@ def build_Me(domain: Mesh,
     return Me
 
 
-def build_M(domain: Mesh, 
-            cell_markers, multi_flag,
-            condition: ischemia_condition, 
-            sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, 
-            scar=False, ischemia=False):
+def build_M(
+    domain: Mesh,
+    cell_markers,
+    multi_flag,
+    condition: ischemia_condition,
+    sigma_i=0.4,
+    sigma_e=0.8,
+    sigma_t=0.8,
+    scar=False,
+    ischemia=False,
+):
     tdim = domain.topology.dim
     f_space = functionspace(domain, ("DG", 0, (tdim, tdim)))
     M = Function(f_space)
@@ -207,7 +231,8 @@ def build_M(domain: Mesh,
     def rho1(x):
         tensor = np.eye(tdim) * sigma_t
         values = np.repeat(tensor, x.shape[1])
-        return values.reshape(tensor.shape[0]*tensor.shape[1], x.shape[1])
+        return values.reshape(tensor.shape[0] * tensor.shape[1], x.shape[1])
+
     def rho2(x):
         tensor1 = np.eye(tdim) * sigma_i
         tensor2 = np.eye(tdim) * sigma_e
@@ -229,15 +254,17 @@ def build_M(domain: Mesh,
         values2 *= factor_local_2
         values = values1 + values2
         return values
+
     def rho3(x):
         tensor = np.eye(tdim) * sigma_t * LUNG_FACTOR
         values = np.repeat(tensor, x.shape[1])
-        return values.reshape(tensor.shape[0]*tensor.shape[1], x.shape[1])
+        return values.reshape(tensor.shape[0] * tensor.shape[1], x.shape[1])
+
     def rho4(x):
         tensor = np.eye(tdim) * sigma_t * CAVITY_FACTOR
         values = np.repeat(tensor, x.shape[1])
-        return values.reshape(tensor.shape[0]*tensor.shape[1], x.shape[1])
-    
+        return values.reshape(tensor.shape[0] * tensor.shape[1], x.shape[1])
+
     M.interpolate(rho1, cell_markers.find(1))
     M.interpolate(rho2, cell_markers.find(2))
     if multi_flag == True:
@@ -250,7 +277,7 @@ def build_M(domain: Mesh,
         M.interpolate(rho1, cell_markers.find(4))
         M.interpolate(rho1, cell_markers.find(5))
         M.interpolate(rho1, cell_markers.find(6))
-            
+
     return M
 
 
@@ -262,24 +289,30 @@ def get_activation_dict(case_name, target_marker=2, gdim=3, mode='ENDO', thresho
 
     mesh_file = f'forward_inverse_3d/data/mesh/mesh_{case_name}.msh'
     geom_file = f'forward_inverse_3d/data/raw_data/geom_{case_name}.mat'
-    activation_file = f'forward_inverse_3d/data/raw_data/activation_times_{case_name}.mat'
+    activation_file = (
+        f'forward_inverse_3d/data/raw_data/activation_times_{case_name}.mat'
+    )
 
     # mesh of Body
     domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
     tdim = domain.topology.dim
     # mesh of Heart
-    subdomain_ventricle, _, _, _ = create_submesh(domain, tdim, cell_markers.find(target_marker))
+    subdomain_ventricle, _, _, _ = create_submesh(
+        domain, tdim, cell_markers.find(target_marker)
+    )
 
     import h5py
+
     geom = h5py.File(geom_file, 'r')
     ventricle_pts = np.array(geom['geom_ventricle']['pts'])
 
     activation_times = h5py.File(activation_file, 'r')
     activation = np.array(activation_times['dep']).reshape(-1)
 
-    assert ventricle_pts.shape[0] == activation.shape[0], \
-        "Number of ventricle points does not match number of activation times"
-    
+    assert (
+        ventricle_pts.shape[0] == activation.shape[0]
+    ), "Number of ventricle points does not match number of activation times"
+
     assert np.unique(activation).shape[0] == activation.shape[0]
 
     # create dict time -> coords
@@ -293,26 +326,35 @@ def get_activation_dict(case_name, target_marker=2, gdim=3, mode='ENDO', thresho
         target_coords = subdomain_ventricle.geometry.x
     elif mode == 'ENDO':
         from utils.ventricular_segmentation_tools import distinguish_epi_endo
+
         epi_endo_marker = distinguish_epi_endo(mesh_file, gdim=gdim)
         endo_idx = np.where(np.isclose(epi_endo_marker, -1.0))[0]
         target_coords = subdomain_ventricle.geometry.x[endo_idx, :]
     elif mode == 'IVS':
         from utils.ventricular_segmentation_tools import get_IVS_region
+
         _, ivs_points, _, _ = get_IVS_region(mesh_file, gdim=gdim, threshold=9)
         target_coords = ivs_points
+    elif mode == 'FREEWALL':
+        from utils.ventricular_segmentation_tools import get_free_wall_region
+
+        target_coords = get_free_wall_region(mesh_file, gdim=gdim)
     else:
         target_coords = None
-    
+
     if target_coords is not None:
-        activation_dict = compute_full_activation_dict(activation_dict, target_coords, threshold)
-    
+        activation_dict = compute_full_activation_dict(
+            activation_dict, target_coords, threshold
+        )
+
     return activation_dict
+
 
 def compute_full_activation_dict(activation_dict, pts, threshold, power=2.0):
     """
     使用 IDW (Inverse Distance Weighting) 对 pts 进行激活时间插值。
     不再使用 activation_dict 的 key 做插值点，只用它存的三维坐标。
-    
+
     参数：
         activation_dict : dict
             {activation_time : point3d}
@@ -320,7 +362,7 @@ def compute_full_activation_dict(activation_dict, pts, threshold, power=2.0):
             待插值的点 (N,3)
         power : float
             IDW 幂指数, 默认 2
-        
+
     返回：
         dict, 结构为 { interpolated_time : point }
     """
@@ -330,8 +372,8 @@ def compute_full_activation_dict(activation_dict, pts, threshold, power=2.0):
         return {}
 
     # ---- 提取已知的时间与坐标 ----
-    known_times = np.array(list(activation_dict.keys()), dtype=float)   # (M,)
-    known_pts   = np.array(list(activation_dict.values()), dtype=float) # (M,3)
+    known_times = np.array(list(activation_dict.keys()), dtype=float)  # (M,)
+    known_pts = np.array(list(activation_dict.values()), dtype=float)  # (M,3)
 
     # ---- 保证 pts 形状正确 ----
     pts = np.asarray(pts, dtype=float)
@@ -341,7 +383,7 @@ def compute_full_activation_dict(activation_dict, pts, threshold, power=2.0):
     # ---- 向量化距离计算 ----
     # diff[i,j,:] = pts[i] - known_pts[j]
     diff = pts[:, None, :] - known_pts[None, :, :]
-    dists = np.linalg.norm(diff, axis=2)   # (N,M)
+    dists = np.linalg.norm(diff, axis=2)  # (N,M)
 
     eps = 1e-12
     result = {}
@@ -358,7 +400,7 @@ def compute_full_activation_dict(activation_dict, pts, threshold, power=2.0):
 
         else:
             # -------- IDW 权值 --------
-            weights = 1.0 / (row ** power)
+            weights = 1.0 / (row**power)
             wsum = weights.sum()
 
             if wsum <= 0:
@@ -380,29 +422,30 @@ def compute_full_activation_dict(activation_dict, pts, threshold, power=2.0):
     result = {k: v for k, v in result.items() if k < threshold}
     return result
 
+
 def transform_v_into_ecgsim_form(v_data, step_per_timeframe):
     from utils.transmembrane_potential_tools import get_activation_time_from_v
-    
-    dep = get_activation_time_from_v(v_data) / step_per_timeframe   # (node_num,)
+
+    dep = get_activation_time_from_v(v_data) / step_per_timeframe  # (node_num,)
     total_frames = v_data.shape[0]
-    
+
     # interval -> (total_frames, 1), 间隔为 1/step_per_timeframe
     interval = (np.arange(total_frames) / step_per_timeframe)[:, None]
     # dep、rep 改为列向量 -> 再放到第二维（节点方向）
-    dep_row = dep[None, :]                  # shape (1, node_num)
-    rep_row = (dep + 300)[None, :]          # shape (1, node_num)
+    dep_row = dep[None, :]  # shape (1, node_num)
+    rep_row = (dep + 300)[None, :]  # shape (1, node_num)
 
     # slopes (broadcast automatically)
-    depslope  = 2.0
+    depslope = 2.0
     platslope = 0.0207
-    repslope  = 0.0416
+    repslope = 0.0416
 
     # ---------- vectorized in (time, node_num) ----------
-    f1 = 1.0 / (1.0 + np.exp(-depslope  * (interval - dep_row)))
-    f2 = 1.0 / (1.0 + np.exp( platslope * (interval - rep_row)))
-    f3 = 1.0 / (1.0 + np.exp( repslope  * (interval - rep_row)))
+    f1 = 1.0 / (1.0 + np.exp(-depslope * (interval - dep_row)))
+    f2 = 1.0 / (1.0 + np.exp(platslope * (interval - rep_row)))
+    f3 = 1.0 / (1.0 + np.exp(repslope * (interval - rep_row)))
 
-    S = f1 * f2 * f3     # shape (time, node_num)
+    S = f1 * f2 * f3  # shape (time, node_num)
 
     # ---------- convert to AP shape ----------
     ampl = 10
@@ -410,6 +453,4 @@ def transform_v_into_ecgsim_form(v_data, step_per_timeframe):
     max_S = np.max(S, axis=0, keepdims=True)  # 注意 axis=0，因为 time 在前
     tmp = S * (ampl - rest) / (max_S + 1e-12) + rest
 
-    return tmp  
-    
-    
+    return tmp

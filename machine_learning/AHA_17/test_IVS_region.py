@@ -5,7 +5,9 @@ from mpi4py import MPI
 import pyvista
 from utils.ventricular_segmentation_tools import get_IVS_region
 
-mesh_file = r'forward_inverse_3d/data/mesh_multi_conduct_ecgsim.msh'
+case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
+case_name = case_name_list[0]
+mesh_file = f'forward_inverse_3d/data/mesh/mesh_{case_name}.msh'
 gdim = 3
 
 _, ivs_points, _, _ = get_IVS_region(mesh_file, gdim=gdim, threshold=18.0)
@@ -18,7 +20,9 @@ plotter = pyvista.Plotter()
 grid = pyvista.UnstructuredGrid(*vtk_mesh(subdomain_ventricle, tdim))
 plotter.add_mesh(grid, show_edges=True)
 
-plotter.add_points(ivs_points, color='red', point_size=10, render_points_as_spheres=True)
+plotter.add_points(
+    ivs_points, color='red', point_size=10, render_points_as_spheres=True
+)
 
 plotter.view_yz()
 plotter.add_axes()

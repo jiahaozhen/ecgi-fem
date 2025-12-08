@@ -5,7 +5,9 @@ from mpi4py import MPI
 import pyvista
 from utils.ventricular_segmentation_tools import get_ring_pts
 
-mesh_file = r'forward_inverse_3d/data/mesh_multi_conduct_ecgsim.msh'
+case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
+case_name = case_name_list[0]
+mesh_file = f'forward_inverse_3d/data/mesh/mesh_{case_name}.msh'
 gdim = 3
 domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
 tdim = domain.topology.dim

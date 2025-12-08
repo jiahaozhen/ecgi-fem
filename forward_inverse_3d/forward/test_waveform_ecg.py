@@ -12,7 +12,7 @@ if __name__ == '__main__':
     T = 500
     step_per_timeframe = 8
 
-    activation_dict = get_activation_dict(case_name, mode='ENDO', threshold=40)
+    activation_dict = get_activation_dict(case_name, mode='FREEWALL')
 
     v_data, _, _ = compute_v_based_on_reaction_diffusion(
         mesh_file,

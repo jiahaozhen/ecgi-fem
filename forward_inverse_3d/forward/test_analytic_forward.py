@@ -1,5 +1,3 @@
-import sys
-
 from dolfinx.io import gmshio
 from dolfinx.mesh import create_submesh, locate_entities_boundary
 from dolfinx.fem import functionspace, Function, form, assemble_scalar
@@ -10,15 +8,24 @@ from dolfinx.plot import vtk_mesh
 from petsc4py import PETSc
 import numpy as np
 import pyvista
+from utils.helper_function import (
+    submesh_node_index,
+    compute_normal,
+)
+from utils.analytic_tool import (
+    calculate_ue_gradients,
+    calculate_ut_gradients,
+    calculate_ue_values,
+    calculate_ut_values,
+)
 
-sys.path.append('.')
-from utils.helper_function import submesh_node_index, compute_normal, eval_function, assign_function
-from utils.analytic_tool import calculate_ue_gradients, calculate_ut_gradients, calculate_ue_values, calculate_ut_values
+from utils.function_tools import assign_function, eval_function
 
 sigma_i = 0.2
 sigma_e = 0.8
 sigma_t = 0.8
-source_point=[0.55,-0.55,0.55]
+source_point = [0.55, -0.55, 0.55]
+
 
 def compute_g(domain):
     tdim = domain.topology.dim
@@ -26,23 +33,32 @@ def compute_g(domain):
     nh_values = compute_normal(domain)
 
     # ut ue
-    boundary_index = locate_entities_boundary(domain, tdim-3, lambda x: np.full(x.shape[1], True, dtype=bool))
+    boundary_index = locate_entities_boundary(
+        domain, tdim - 3, lambda x: np.full(x.shape[1], True, dtype=bool)
+    )
     coords = domain.geometry.x[boundary_index]
     ut_gradient_values = calculate_ut_gradients(coords, source_point).T
     ue_gradient_values = calculate_ue_gradients(coords, source_point).T
 
     # g
-    g = -(sigma_i+sigma_e)/sigma_i * np.sum(ue_gradient_values*nh_values, axis=1)\
-        + sigma_t/sigma_i * np.sum(ut_gradient_values*nh_values, axis=1)\
-        + 2*(sigma_i+sigma_e)/sigma_i * np.sum(coords*nh_values, axis=1)
-    
+    g = (
+        -(sigma_i + sigma_e) / sigma_i * np.sum(ue_gradient_values * nh_values, axis=1)
+        + sigma_t / sigma_i * np.sum(ut_gradient_values * nh_values, axis=1)
+        + 2 * (sigma_i + sigma_e) / sigma_i * np.sum(coords * nh_values, axis=1)
+    )
+
     return g
 
+
 def main():
-    domain, cell_markers, _ = gmshio.read_from_msh('3d/data/heart_torso.msh', MPI.COMM_WORLD, gdim=3)
+    domain, cell_markers, _ = gmshio.read_from_msh(
+        'forward_inverse_3d/data/mesh/heart_torso.msh', MPI.COMM_WORLD, gdim=3
+    )
     tdim = domain.topology.dim
 
-    subdomain, ventricle_to_torso, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
+    subdomain, ventricle_to_torso, _, _ = create_submesh(
+        domain, tdim, cell_markers.find(2)
+    )
     V1 = functionspace(domain, ("Lagrange", 1))
     V2 = functionspace(subdomain, ("Lagrange", 1))
 
@@ -50,8 +66,12 @@ def main():
     u2 = TrialFunction(V2)
     v2 = TestFunction(V2)
     g = Function(V2)
-    boundary_index = locate_entities_boundary(domain, tdim-3, lambda x: np.full(x.shape[1], True, dtype=bool))
-    subboundary_index = locate_entities_boundary(subdomain, tdim-3, lambda x: np.full(x.shape[1], True, dtype=bool))
+    boundary_index = locate_entities_boundary(
+        domain, tdim - 3, lambda x: np.full(x.shape[1], True, dtype=bool)
+    )
+    subboundary_index = locate_entities_boundary(
+        subdomain, tdim - 3, lambda x: np.full(x.shape[1], True, dtype=bool)
+    )
     sub_to_parent_index = submesh_node_index(domain, cell_markers, 2)
     g_val = np.zeros((len(subdomain.geometry.x)))
     g_val[subboundary_index] = compute_g(subdomain)
@@ -64,18 +84,22 @@ def main():
     v_f = problem.solve()
 
     v = Function(V2)
-    v.x.array[:] = v_f.x.array - np.mean(v_f.x.array) 
-    v.x.array[:] = v.x.array - 5 * np.sum(V2.tabulate_dof_coordinates()*V2.tabulate_dof_coordinates(), axis=1)
+    v.x.array[:] = v_f.x.array - np.mean(v_f.x.array)
+    v.x.array[:] = v.x.array - 5 * np.sum(
+        V2.tabulate_dof_coordinates() * V2.tabulate_dof_coordinates(), axis=1
+    )
     v_exact = -calculate_ut_values(subdomain.geometry.x, source_point)
     v_exact = v_exact - np.mean(v_exact)
-    v_exact = v_exact - 5 * np.sum(subdomain.geometry.x*subdomain.geometry.x, axis=1)
+    v_exact = v_exact - 5 * np.sum(subdomain.geometry.x * subdomain.geometry.x, axis=1)
 
     # boundary gt
     gt = Function(V1)
     coords = domain.geometry.x[boundary_index]
     ut_gradient_values = calculate_ut_gradients(coords, source_point).T
     nt_values = compute_normal(domain)
-    gt.x.array[boundary_index] = np.sum(nt_values*ut_gradient_values, axis=1) * sigma_t
+    gt.x.array[boundary_index] = (
+        np.sum(nt_values * ut_gradient_values, axis=1) * sigma_t
+    )
 
     # forward u
     M = Function(V1)
@@ -88,20 +112,20 @@ def main():
     # matrix A
     u1 = TrialFunction(V1)
     v1 = TestFunction(V1)
-    dx1 = Measure("dx", domain = domain)
+    dx1 = Measure("dx", domain=domain)
     a_element = M * dot(grad(u1), grad(v1)) * dx1
     bilinear_form_a = form(a_element)
     A = assemble_matrix(bilinear_form_a)
     A.assemble()
 
     # b
-    dx2 = Measure("dx", domain = subdomain)
-    ds = Measure("ds", domain = domain)
-    b_element_1 = -sigma_i * dot(grad(v1), grad(v)) * dx2 
+    dx2 = Measure("dx", domain=subdomain)
+    ds = Measure("ds", domain=domain)
+    b_element_1 = -sigma_i * dot(grad(v1), grad(v)) * dx2
     b_element_2 = v1 * gt * ds
     entity_map = {domain._cpp_object: ventricle_to_torso}
-    linear_form_b_1 = form(b_element_1, entity_maps = entity_map)
-    linear_form_b_2 = form(b_element_2, entity_maps = entity_map)
+    linear_form_b_1 = form(b_element_1, entity_maps=entity_map)
+    linear_form_b_2 = form(b_element_2, entity_maps=entity_map)
     b = assemble_vector(linear_form_b_1) + assemble_vector(linear_form_b_2)
 
     solver = PETSc.KSP().create()
@@ -113,22 +137,27 @@ def main():
     # u_exact
     u_exact = Function(V1)
     u_exact.x.array[:] = calculate_ut_values(domain.geometry.x, source_point)
-    u_exact.x.array[sub_to_parent_index] = calculate_ue_values(subdomain.geometry.x, source_point)
+    u_exact.x.array[sub_to_parent_index] = calculate_ue_values(
+        subdomain.geometry.x, source_point
+    )
 
     # adjust result
-    ds = Measure('ds', domain = domain)
+    ds = Measure('ds', domain=domain)
     c1_element = (u_exact - u) * ds
     c2_element = 1 * ds
     form_c1 = form(c1_element)
     form_c2 = form(c2_element)
-    c = assemble_scalar(form_c1)/assemble_scalar(form_c2)
+    c = assemble_scalar(form_c1) / assemble_scalar(form_c2)
     u.x.array[:] = u.x.array + c
 
-    print('u relative error:', np.linalg.norm(u.x.array - u_exact.x.array) / np.linalg.norm(u_exact.x.array))
+    print(
+        'u relative error:',
+        np.linalg.norm(u.x.array - u_exact.x.array) / np.linalg.norm(u_exact.x.array),
+    )
     print('u cc: ', np.corrcoef(u.x.array, u_exact.x.array)[0, 1])
 
     # plot
-    plotter_v = pyvista.Plotter(shape=(1,3))
+    plotter_v = pyvista.Plotter(shape=(1, 3))
 
     plotter_v.subplot(0, 0)
     grid_v_exact = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
@@ -173,7 +202,7 @@ def main():
     ue_exact_boundary[mask] = ue_exact_boundary[subboundary_index[0]]
     grid_ue_exact.point_data["ue_exact"] = ue_exact_boundary
     grid_ue_exact.set_active_scalars("ue_exact")
-    plotter.add_mesh(grid_ue_exact, show_edges=True, scalar_bar_args = {"fmt": "%.3f"})
+    plotter.add_mesh(grid_ue_exact, show_edges=True, scalar_bar_args={"fmt": "%.3f"})
     plotter.view_xz()
     plotter.add_axes()
     plotter.add_title("Heart potential exact (ue_exact)", font_size=9)
@@ -185,7 +214,7 @@ def main():
     ut_exact_boundary[mask] = ut_exact_boundary[boundary_index[0]]
     grid_ut_exact.point_data["ut_exact"] = ut_exact_boundary
     grid_ut_exact.set_active_scalars("ut_exact")
-    plotter.add_mesh(grid_ut_exact, show_edges=True, scalar_bar_args = {"fmt": "%.3f"})
+    plotter.add_mesh(grid_ut_exact, show_edges=True, scalar_bar_args={"fmt": "%.3f"})
     plotter.view_xz()
     plotter.add_axes()
     plotter.add_title("Torso potential exact (ut_exact)", font_size=9)
@@ -197,7 +226,7 @@ def main():
     ue_boundary[mask] = ue_boundary[subboundary_index[0]]
     grid_ue.point_data["ue"] = ue_boundary
     grid_ue.set_active_scalars("ue")
-    plotter.add_mesh(grid_ue, show_edges=True, scalar_bar_args = {"fmt": "%.3f"})
+    plotter.add_mesh(grid_ue, show_edges=True, scalar_bar_args={"fmt": "%.3f"})
     plotter.view_xz()
     plotter.add_axes()
     plotter.add_title("Heart potential (ue_numerical)", font_size=9)
@@ -209,7 +238,7 @@ def main():
     ut_boundary[mask] = ut_boundary[boundary_index[0]]
     grid_ut.point_data["ut"] = ut_boundary
     grid_ut.set_active_scalars("ut")
-    plotter.add_mesh(grid_ut, show_edges=True, scalar_bar_args = {"fmt": "%.3f"})
+    plotter.add_mesh(grid_ut, show_edges=True, scalar_bar_args={"fmt": "%.3f"})
     plotter.view_xz()
     plotter.add_axes()
     plotter.add_title("Torso potential (ut_numerical)", font_size=9)
@@ -232,7 +261,8 @@ def main():
     # plotter.add_axes()
     # plotter.add_title("Torso potential error (ut_error)", font_size=9)
     plotter.window_size = [720, 720]
-    plotter.screenshot("3d/main_analytic_forward.png")
+    # plotter.screenshot("main_analytic_forward.png")
+
 
 if __name__ == '__main__':
     main()

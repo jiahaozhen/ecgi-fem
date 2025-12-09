@@ -18,5 +18,6 @@ gmsh.model.addPhysicalGroup(3, [2], 2)
 
 # gmsh.model.mesh.setSize(gmsh.model.getEntities(0), 0.05)
 gmsh.model.mesh.generate(3)
+gmsh.write('forward_inverse_3d/data/mesh/heart_torso.msh')
 gmsh.fltk.run()
 gmsh.finalize()

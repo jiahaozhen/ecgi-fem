@@ -1,5 +1,6 @@
-from utils.visualize_tools import plot_scatter_on_mesh
+from utils.visualize_tools import scatter_on_mesh
 from utils.simulate_tools import get_activation_dict
+import numpy as np
 
 if __name__ == "__main__":
     case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
@@ -8,4 +9,6 @@ if __name__ == "__main__":
 
     activation_dict = get_activation_dict(case_name, mode='IVS', threshold=60)
 
-    plot_scatter_on_mesh(mesh_file, scatter_pts=list(activation_dict.values()))
+    target_pts = np.asarray(list(activation_dict.values()))
+
+    scatter_on_mesh(mesh_file, target_pts, target_cell=2)

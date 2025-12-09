@@ -1,9 +1,9 @@
 from dolfinx.io import gmshio
 from dolfinx.mesh import create_submesh
-from dolfinx.plot import vtk_mesh
 from mpi4py import MPI
-import pyvista
+import numpy as np
 from utils.ventricular_segmentation_tools import get_ring_pts, get_apex_from_annulus_pts
+from utils.visualize_tools import scatter_on_mesh
 
 case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
 case_name = case_name_list[0]
@@ -15,23 +15,12 @@ tdim = domain.topology.dim
 subdomain_ventricle, _, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
 
 points = subdomain_ventricle.geometry.x
-left_ring_index, ring_ring_index, left_ring_pts, right_ring_pts = get_ring_pts(
-    mesh_file, gdim=gdim
-)
+_, _, left_ring_pts, _ = get_ring_pts(mesh_file, gdim=gdim)
 apex_point = get_apex_from_annulus_pts(points, left_ring_pts)
 
-plotter = pyvista.Plotter()
-grid = pyvista.UnstructuredGrid(*vtk_mesh(subdomain_ventricle, tdim))
-plotter.add_mesh(grid, show_edges=True)
-
-plotter.add_points(
-    left_ring_pts, color='red', point_size=10, render_points_as_spheres=True
+scatter_on_mesh(
+    mesh_file,
+    np.vstack([left_ring_pts, apex_point]),
+    target_cell=2,
+    title='apex on ventricle',
 )
-
-plotter.add_points(
-    apex_point, color='red', point_size=10, render_points_as_spheres=True
-)
-
-plotter.view_yz()
-plotter.add_axes()
-plotter.show()

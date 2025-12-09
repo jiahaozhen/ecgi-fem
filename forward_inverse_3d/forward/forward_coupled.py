@@ -1,6 +1,5 @@
-from dolfinx import default_scalar_type
 from dolfinx.io import gmshio
-from dolfinx.fem import functionspace, form, Constant, Function
+from dolfinx.fem import functionspace, form, Function
 from dolfinx.fem.petsc import assemble_matrix, assemble_vector, create_vector
 from dolfinx.mesh import create_submesh
 import numpy as np
@@ -48,7 +47,7 @@ def forward_tmp(
     M = build_M(
         domain,
         cell_markers=cell_markers,
-        multi_flag=True,
+        multi_flag=multi_flag,
         condition=None,
         sigma_i=sigma_i,
         sigma_e=sigma_e,

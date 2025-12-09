@@ -17,7 +17,17 @@ import h5py
 sys.path.append('.')
 from utils.helper_function import eval_function
 
-def forward_tmp(mesh_file, v_data, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_flag=True, plot_flag=False, gdim=3):
+
+def forward_tmp(
+    mesh_file,
+    v_data,
+    sigma_i=0.4,
+    sigma_e=0.8,
+    sigma_t=0.8,
+    multi_flag=True,
+    plot_flag=False,
+    gdim=3,
+):
     """
     Solves the forward problem for cardiac and torso electrostatic potentials using the finite element method (FEM).
     This function computes the transmembrane potential (TMP) in the body based on the provided ECG simulation data.
@@ -37,7 +47,9 @@ def forward_tmp(mesh_file, v_data, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_
     domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
     tdim = domain.topology.dim
     # mesh of Heart
-    subdomain_ventricle, ventricle_to_torso, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
+    subdomain_ventricle, ventricle_to_torso, _, _ = create_submesh(
+        domain, tdim, cell_markers.find(2)
+    )
 
     V1 = functionspace(domain, ("Lagrange", 1))
     V2 = functionspace(subdomain_ventricle, ("Lagrange", 1))
@@ -48,20 +60,23 @@ def forward_tmp(mesh_file, v_data, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_
     def rho1(x):
         tensor = np.eye(tdim) * sigma_t
         values = np.repeat(tensor, x.shape[1])
-        return values.reshape(tensor.shape[0]*tensor.shape[1], x.shape[1])
+        return values.reshape(tensor.shape[0] * tensor.shape[1], x.shape[1])
+
     def rho2(x):
         tensor = np.eye(tdim) * (sigma_i + sigma_e)
         values = np.repeat(tensor, x.shape[1])
-        return values.reshape(tensor.shape[0]*tensor.shape[1], x.shape[1])
+        return values.reshape(tensor.shape[0] * tensor.shape[1], x.shape[1])
+
     def rho3(x):
         tensor = np.eye(tdim) * sigma_t / 5
         values = np.repeat(tensor, x.shape[1])
-        return values.reshape(tensor.shape[0]*tensor.shape[1], x.shape[1])
+        return values.reshape(tensor.shape[0] * tensor.shape[1], x.shape[1])
+
     def rho4(x):
         tensor = np.eye(tdim) * sigma_t * 3
         values = np.repeat(tensor, x.shape[1])
-        return values.reshape(tensor.shape[0]*tensor.shape[1], x.shape[1])
-    
+        return values.reshape(tensor.shape[0] * tensor.shape[1], x.shape[1])
+
     M = Function(V3)
     M.interpolate(rho1, cell_markers.find(1))
     M.interpolate(rho2, cell_markers.find(2))
@@ -81,7 +96,7 @@ def forward_tmp(mesh_file, v_data, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_
     # matrix A
     u1 = TrialFunction(V1)
     v1 = TestFunction(V1)
-    dx1 = Measure("dx", domain = domain)
+    dx1 = Measure("dx", domain=domain)
     a_element = dot(grad(v1), dot(M, grad(u1))) * dx1
     bilinear_form_a = form(a_element)
     A = assemble_matrix(bilinear_form_a)
@@ -100,7 +115,7 @@ def forward_tmp(mesh_file, v_data, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_
     solver.getPC().setType(PETSc.PC.Type.LU)
 
     if v_data.ndim == 1:
-        v_data = v_data.reshape(1,-1)
+        v_data = v_data.reshape(1, -1)
     total_num = len(v_data)
     u_data = []
     for i in range(total_num):
@@ -128,6 +143,7 @@ def forward_tmp(mesh_file, v_data, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_
         plotter.show()
     return np.array(u_data)
 
+
 def extract_d_from_u(mesh_file, points, u_data):
     domain, _, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=3)
     V = functionspace(domain, ("Lagrange", 1))
@@ -140,24 +156,35 @@ def extract_d_from_u(mesh_file, points, u_data):
         d_data.append(d.copy())
     return np.array(d_data)
 
-def compute_d_from_tmp(mesh_file, v_data, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_flag=True):
+
+def compute_d_from_tmp(
+    mesh_file, v_data, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, multi_flag=True
+):
     # v_data = np.load(v_file)
-    u_data = forward_tmp(mesh_file, v_data, sigma_i=sigma_i, sigma_e=sigma_e, sigma_t=sigma_t, multi_flag=multi_flag)
+    u_data = forward_tmp(
+        mesh_file,
+        v_data,
+        sigma_i=sigma_i,
+        sigma_e=sigma_e,
+        sigma_t=sigma_t,
+        multi_flag=multi_flag,
+    )
     geom = h5py.File(r'forward_inverse_3d/data/geom_ecgsim.mat', 'r')
     points = np.array(geom['geom_thorax']['pts'])
     d_data = extract_d_from_u(mesh_file, points, u_data)
     return d_data
+
 
 if __name__ == '__main__':
     file = "3d/data/mesh_multi_conduct_ecgsim.msh"
     ischemia = True
     # v_data = np.load('3d/data/v.npy')
     # u_data = forward_tmp(file, v_data, multi_flag=False)
-    if ischemia :
+    if ischemia:
         surface_potential_file = '3d/data/ischemia_heart_cycle_fem.mat'
-        v_file='3d/data/v_all_ischemia.npy'
+        v_file = '3d/data/v_all_ischemia.npy'
     else:
         surface_potential_file = '3d/data/sinus_rhythm_fem.mat'
-        v_file='3d/data/v_all_normal.npy'
+        v_file = '3d/data/v_all_normal.npy'
     d = compute_d_from_tmp(file, v_file=v_file)
     sio.savemat(surface_potential_file, {'surface_potential_fem': d})

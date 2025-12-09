@@ -1,5 +1,3 @@
-import sys
-
 from dolfinx.io import gmshio
 from dolfinx.mesh import create_submesh
 from dolfinx.fem import functionspace, form
@@ -9,12 +7,12 @@ from petsc4py import PETSc
 from mpi4py import MPI
 from ufl import grad, div, Measure, TestFunction, TrialFunction
 from scipy.sparse import csr_matrix
-
-sys.path.append('.')
 from utils.helper_function import petsc2array
 
 # mesh of Body
-domain, cell_markers, facet_markers = gmshio.read_from_msh("3d/data/mesh_multi_conduct_ecgsim.msh", MPI.COMM_WORLD, gdim=3)
+domain, cell_markers, facet_markers = gmshio.read_from_msh(
+    r'forward_inverse_3d/data/mesh/mesh_normal_male.msh', MPI.COMM_WORLD, gdim=3
+)
 tdim = domain.topology.dim
 # mesh of Heart
 subdomain, sub_to_parent, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
@@ -22,7 +20,7 @@ sub_node_num = subdomain.topology.index_map(tdim - 3).size_local
 
 A = PETSc.Mat().create()
 A.setSizes([sub_node_num, sub_node_num])
-A.setType(PETSc.Mat.Type.MPIAIJ) 
+A.setType(PETSc.Mat.Type.MPIAIJ)
 A.setUp()
 
 subdomain.topology.create_connectivity(1, 0)
@@ -50,9 +48,7 @@ L_matrix = petsc2array(L)
 LT_matrix = petsc2array(LT)
 LTL_matrix = LT_matrix @ L_matrix
 
-np.save('3d/data/LTL_matrix.npy', LTL_matrix)
-
-V = functionspace(subdomain, ("Lagrange", 1))
+V = functionspace(subdomain, ("Lagrange", 2))
 u = TestFunction(V)
 v = TrialFunction(V)
 dx = Measure('dx', subdomain)
@@ -65,7 +61,6 @@ LTL_integral.assemble()
 # LTL_integral = assemble_vector(form_a_element)
 # LTL_integral.view()
 LTL_integral = petsc2array(LTL_integral)
-np.save('3d/data/LTL_integral.npy', LTL_integral)
 
 index_1 = np.nonzero(LTL_matrix)
 index_2 = np.nonzero(LTL_integral)

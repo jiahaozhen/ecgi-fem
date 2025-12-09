@@ -10,21 +10,33 @@ v_exact = np.load(v_file)
 activation_time_exact = get_activation_time_from_v(v_exact)
 activation_time_noise = add_noise_based_on_snr(activation_time_exact, snr=20)
 
-print("Correlation between exact and noisy activation times:", 
-      np.corrcoef(activation_time_exact, activation_time_noise)[0, 1])
+print(
+    "Correlation between exact and noisy activation times:",
+    np.corrcoef(activation_time_exact, activation_time_noise)[0, 1],
+)
 
-mesh_file = r'forward_inverse_3d/data/mesh_multi_conduct_ecgsim.msh'
+mesh_file = r'forward_inverse_3d/data/mesh/mesh_normal_male.msh'
 
-p1 = multiprocessing.Process(target=plot_val_on_mesh, kwargs={'mesh_file': mesh_file,
-                                                              'val': activation_time_exact,
-                                                              'title': "Exact Activation Time",
-                                                              'target_cell': 2,
-                                                              'f_val_flag': True})
-p2 = multiprocessing.Process(target=plot_val_on_mesh, kwargs={'mesh_file': mesh_file,
-                                                              'val': activation_time_noise,
-                                                              'title': "Noisy Activation Time",
-                                                              'target_cell': 2,
-                                                              'f_val_flag': True})
+p1 = multiprocessing.Process(
+    target=plot_val_on_mesh,
+    kwargs={
+        'mesh_file': mesh_file,
+        'val': activation_time_exact,
+        'title': "Exact Activation Time",
+        'target_cell': 2,
+        'f_val_flag': True,
+    },
+)
+p2 = multiprocessing.Process(
+    target=plot_val_on_mesh,
+    kwargs={
+        'mesh_file': mesh_file,
+        'val': activation_time_noise,
+        'title': "Noisy Activation Time",
+        'target_cell': 2,
+        'f_val_flag': True,
+    },
+)
 p1.start()
 p2.start()
 p1.join()

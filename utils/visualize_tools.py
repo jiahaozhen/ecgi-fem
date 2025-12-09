@@ -4,7 +4,7 @@ from matplotlib.cm import get_cmap
 import numpy as np
 import pyvista
 from mpi4py import MPI
-from dolfinx.mesh import create_submesh
+from dolfinx.mesh import create_submesh, locate_entities_boundary
 from dolfinx.fem import Function, functionspace
 from dolfinx.io import gmshio
 from dolfinx.plot import vtk_mesh
@@ -488,8 +488,27 @@ def plot_vals_on_mesh(
         grid.set_active_scalars(name)
 
         plotter.add_mesh(grid, show_edges=True)
-        plotter.add_title(f"{title} (t={t/step_per_timeframe}s)")
+        plotter.add_title(f"{title} (t={t/step_per_timeframe}s)", font_size=10)
         plotter.view_yz()
         plotter.add_axes()
 
     plotter.show(auto_close=False)
+
+
+def plot_val_on_surface(domain, val, function_space, title, tdim=3):
+    plotter = pyvista.Plotter()
+    grid = pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim))
+    f = Function(function_space)
+    f.x.array[:] = val
+    domain_boundary = locate_entities_boundary(
+        domain, tdim - 3, lambda x: np.full(x.shape[1], True, dtype=bool)
+    )
+    f_boundary = eval_function(f, domain.geometry.x).squeeze()
+    mask = ~np.isin(np.arange(len(f_boundary)), domain_boundary)
+    f_boundary[mask] = f_boundary[domain_boundary[0]]
+    grid.point_data['f'] = f_boundary
+
+    grid.set_active_scalars('f')
+    plotter.add_mesh(grid, show_edges=True)
+    plotter.add_title(title)
+    plotter.show()

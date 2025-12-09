@@ -13,28 +13,47 @@ from utils.helper_function import find_vertex_with_neighbour_less_than_0
 from utils.simulate_tools import build_M, build_Mi
 from utils.visualize_tools import plot_f_on_domain, plot_loss_and_cm
 
-def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
-                               gdim=3, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8, 
-                               tau=10, alpha1=1e-2, 
-                               ischemia_potential=-80, normal_potential=-90, 
-                               multi_flag=True, plot_flag=False, 
-                               print_message=False, transmural_flag=False):
+
+def resting_ischemia_inversion(
+    mesh_file,
+    d_data,
+    v_data=None,
+    gdim=3,
+    sigma_i=0.4,
+    sigma_e=0.8,
+    sigma_t=0.8,
+    tau=10,
+    alpha1=1e-2,
+    ischemia_potential=-80,
+    normal_potential=-90,
+    multi_flag=True,
+    plot_flag=False,
+    print_message=False,
+    transmural_flag=False,
+):
     # mesh of Body
     domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
     tdim = domain.topology.dim
     # mesh of Heart
-    subdomain_ventricle, ventricle_to_torso, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
+    subdomain_ventricle, ventricle_to_torso, _, _ = create_submesh(
+        domain, tdim, cell_markers.find(2)
+    )
     sub_node_num = subdomain_ventricle.topology.index_map(tdim - 3).size_local
 
     # function space
     V1 = functionspace(domain, ("Lagrange", 1))
     V2 = functionspace(subdomain_ventricle, ("Lagrange", 1))
 
-    M = build_M(domain, cell_markers, condition=None, 
-                sigma_i=sigma_i, sigma_e=sigma_e, sigma_t=sigma_t, 
-                multi_flag=multi_flag)
-    Mi = build_Mi(subdomain_ventricle, condition=None, 
-                  sigma_i=sigma_i)
+    M = build_M(
+        domain,
+        cell_markers,
+        condition=None,
+        sigma_i=sigma_i,
+        sigma_e=sigma_e,
+        sigma_t=sigma_t,
+        multi_flag=multi_flag,
+    )
+    Mi = build_Mi(subdomain_ventricle, condition=None, sigma_i=sigma_i)
 
     # phi delta_phi delta_deri_phi
     phi = Function(V2)
@@ -62,8 +81,13 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
     solver.getPC().setType(PETSc.PC.Type.ILU)
 
     # vector b_u
-    dx2 = Measure("dx",domain=subdomain_ventricle)
-    b_u_element = (ischemia_potential - normal_potential) * delta_phi * dot(grad(u1), dot(Mi, grad(phi))) * dx2
+    dx2 = Measure("dx", domain=subdomain_ventricle)
+    b_u_element = (
+        (ischemia_potential - normal_potential)
+        * delta_phi
+        * dot(grad(u1), dot(Mi, grad(phi)))
+        * dx2
+    )
     entity_map = {domain._cpp_object: ventricle_to_torso}
     linear_form_b_u = form(b_u_element, entity_maps=entity_map)
     b_u = create_vector(linear_form_b_u)
@@ -88,21 +112,26 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
 
     # vector direction
     u2 = TestFunction(V2)
-    j_p = (ischemia_potential - normal_potential) * delta_deri_phi * u2 * dot(grad(w), dot(Mi, grad(phi))) * dx2 \
-            + (ischemia_potential - normal_potential) * delta_phi * dot(grad(w), dot(Mi, grad(u2))) * dx2
-    reg_p = alpha1 * derivative(delta_phi * sqrt(inner(grad(phi), grad(phi)) + 1e-8) * dx2, phi, u2)
+    j_p = (ischemia_potential - normal_potential) * delta_deri_phi * u2 * dot(
+        grad(w), dot(Mi, grad(phi))
+    ) * dx2 + (ischemia_potential - normal_potential) * delta_phi * dot(
+        grad(w), dot(Mi, grad(u2))
+    ) * dx2
+    reg_p = alpha1 * derivative(
+        delta_phi * sqrt(inner(grad(phi), grad(phi)) + 1e-8) * dx2, phi, u2
+    )
     form_J_p = form(j_p, entity_maps=entity_map)
     form_Reg_p = form(reg_p, entity_maps=entity_map)
     J_p = create_vector(form_J_p)
     Reg_p = create_vector(form_Reg_p)
 
     # initial phi
-    phi_0 = np.full(phi.x.array.shape, tau/2)
+    phi_0 = np.full(phi.x.array.shape, tau / 2)
     # phi_0 = np.where(v_data == -80, -tau/2, tau/2)
     # phi_0 = get_epi_endo_marker(V2) * tau / 1e2
     phi.x.array[:] = phi_0
     delta_phi.x.array[:] = delta_tau(phi.x.array, tau)
-    
+
     # exact solution
     v_exact = Function(V2)
     v_exact.x.array[:] = v_data
@@ -113,7 +142,7 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
     assemble_vector(b_u, linear_form_b_u)
     solver.solve(b_u, u.vector)
     # adjust u
-    adjustment = assemble_scalar(form_c1)/assemble_scalar(form_c2)
+    adjustment = assemble_scalar(form_c1) / assemble_scalar(form_c2)
     u.x.array[:] = u.x.array + adjustment
 
     loss_per_iter = []
@@ -121,7 +150,7 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
 
     k = 0
     total_iter = 2e2
-    while (True):
+    while True:
         delta_deri_phi.x.array[:] = delta_deri_tau(phi.x.array, tau)
 
         # cost function
@@ -139,7 +168,7 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
             loc_J.set(0)
         assemble_vector(J_p, form_J_p)
         with Reg_p.localForm() as loc_R:
-                loc_R.set(0)
+            loc_R.set(0)
         assemble_vector(Reg_p, form_Reg_p)
         J_p = J_p + Reg_p
         if print_message == True:
@@ -149,14 +178,14 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
             print('J_p', np.linalg.norm(J_p.array))
             print('center of mass error:', compute_error(v_exact, phi)[0])
         # check if the condition is satisfied
-        if (k > total_iter or np.linalg.norm(J_p.array) < 1e-1):
+        if k > total_iter or np.linalg.norm(J_p.array) < 1e-1:
             break
         k = k + 1
 
         # updata p from partial derivative
         dir_p = -J_p.array.copy()
         phi_v = phi.x.array[:].copy()
-        
+
         # Barzilai-Borwein Method
         # J_p_current = J_p.array.copy()
         # if k == 1:
@@ -177,13 +206,13 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
         # # adjust u
         # adjustment = assemble_scalar(form_c1) / assemble_scalar(form_c2)
         # u.x.array[:] = u.x.array + adjustment
-        
+
         # Armijo Method
         alpha = 1
         gamma = 0.8
         c = 0.1
         step_search = 0
-        while(True):
+        while True:
             # adjust p
             phi.x.array[:] = phi_v + alpha * dir_p
             # compute u
@@ -201,14 +230,18 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
             loss_cmp = loss_new - (loss + c * alpha * J_p.array.dot(dir_p))
             alpha = gamma * alpha
             step_search = step_search + 1
-            if (step_search > 100 or loss_cmp < 0):
+            if step_search > 100 or loss_cmp < 0:
                 if transmural_flag == True:
                     # for p < 0, make its neighbor smaller
-                    neighbour_idx, _ = find_vertex_with_neighbour_less_than_0(subdomain_ventricle, phi) 
+                    neighbour_idx, _ = find_vertex_with_neighbour_less_than_0(
+                        subdomain_ventricle, phi
+                    )
                     # make them smaller
-                    phi.x.array[neighbour_idx] = np.where(phi.x.array[neighbour_idx] >= 0, 
-                                                          phi.x.array[neighbour_idx] - tau / total_iter, 
-                                                          phi.x.array[neighbour_idx])
+                    phi.x.array[neighbour_idx] = np.where(
+                        phi.x.array[neighbour_idx] >= 0,
+                        phi.x.array[neighbour_idx] - tau / total_iter,
+                        phi.x.array[neighbour_idx],
+                    )
                     # compute u
                     delta_phi.x.array[:] = delta_tau(phi.x.array, tau)
                     with b_u.localForm() as loc_b:
@@ -231,9 +264,16 @@ def resting_ischemia_inversion(mesh_file, d_data, v_data=None,
     marker_exact = Function(V2)
     marker_exact.x.array[:] = np.where(v_exact.x.array == ischemia_potential, 1, 0)
 
-    p1 = multiprocessing.Process(target=plot_f_on_domain, args=(subdomain_ventricle, marker, 'ischemia_result'))
-    p2 = multiprocessing.Process(target=plot_f_on_domain, args=(subdomain_ventricle, marker_exact, 'ischemia_exact'))
-    p3 = multiprocessing.Process(target=plot_loss_and_cm, args=(loss_per_iter, cm_cmp_per_iter))
+    p1 = multiprocessing.Process(
+        target=plot_f_on_domain, args=(subdomain_ventricle, marker, 'ischemia_result')
+    )
+    p2 = multiprocessing.Process(
+        target=plot_f_on_domain,
+        args=(subdomain_ventricle, marker_exact, 'ischemia_exact'),
+    )
+    p3 = multiprocessing.Process(
+        target=plot_loss_and_cm, args=(loss_per_iter, cm_cmp_per_iter)
+    )
     p1.start()
     p2.start()
     p3.start()

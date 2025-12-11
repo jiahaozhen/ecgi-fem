@@ -47,7 +47,7 @@ def transfer_bsp_to_standard300lead(
     geom = h5py.File(geom_file, 'r')
     lead_index = np.array(geom['leadelec']).astype(int) - 1
     lead_index = lead_index.reshape(-1)
-    lead_index = lead_index[-3, :]
+    lead_index = lead_index[-3:]
     bsp_data = np.asarray(bsp_data, dtype=float)
     bsp_data = bsp_data - np.mean(bsp_data[:, lead_index], axis=1, keepdims=True)
     return bsp_data
@@ -60,7 +60,7 @@ def transfer_bsp_to_standard64lead(
     geom = h5py.File(geom_file, 'r')
     lead_index = np.array(geom['leadelec']).astype(int) - 1
     lead_index = lead_index.reshape(-1)
-    lead_index = lead_index[-3, :]
+    lead_index = lead_index[-3:]
     bsp_data = np.asarray(bsp_data, dtype=float)
     if lead_index is not None:
         bsp_data = bsp_data[:, 0:64] - np.mean(
@@ -153,6 +153,18 @@ def add_noise_based_on_snr(data: np.ndarray, snr: float) -> np.ndarray:
     noise = np.random.normal(0, np.sqrt(noise_power), data.shape)
     noisy_data = data + noise
     return noisy_data
+
+
+def normalize_ecg_zscore(ecg: np.ndarray) -> np.ndarray:
+    ecg = ecg.T
+
+    means = np.mean(ecg, axis=1, keepdims=True)
+    stds = np.std(ecg, axis=1, keepdims=True)
+    stds[stds == 0] = 1e-8  # avoid division by zero
+
+    ecg = (ecg - means) / stds
+
+    return ecg.T
 
 
 def check_noise_level_snr(data: np.ndarray, noise: np.ndarray) -> float:

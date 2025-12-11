@@ -3,13 +3,14 @@ from machine_learning.ml_method.knn_method import knn_classifier
 from machine_learning.ml_method.lda_method import lda_classifier
 from machine_learning.ml_method.lgb_method import lgb_classifier
 from machine_learning.ml_method.lmt_method import lmt_classifier
-from adaboost_lmt_V1_V6_17 import adaboost_lmt_classifier
-from machine_learning.ml_method.bayes_method import bayes_classifier
 from machine_learning.ml_method.xgb_method import xgb_classifier
-from utils.machine_learning_tools import load_dataset, split_dataset
+from utils.machine_learning_tools import load_dataset, exclude_classes, split_dataset
 
-data_dir = 'machine_learning/data/dataset/d6_standard_dataset'
+data_dir = (
+    'machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/'
+)
 X, y = load_dataset(data_dir)
+X, y = exclude_classes(X, y, exclude_labels=[-1])
 X_train, X_test, y_train, y_test = split_dataset(X, y)
 
 methods = [

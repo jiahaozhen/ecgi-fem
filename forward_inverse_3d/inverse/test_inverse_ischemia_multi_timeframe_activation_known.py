@@ -15,7 +15,12 @@ if __name__ == '__main__':
     phi_1_exact = np.load(phi_1_file)
     phi_2_exact = np.load(phi_2_file)
 
-    time_sequence = np.arange(0, 50, 5)
+    # rest inversion
+    # time_sequence = np.arange(0, 50, 5)
+
+    # activation inversion
+    time_sequence = np.arange(0, 1200, 20)
+
     ischemia_inversion(
         mesh_file=mesh_file,
         d_data=d,
@@ -23,6 +28,8 @@ if __name__ == '__main__':
         phi_1_exact=phi_1_exact,
         phi_2_exact=phi_2_exact,
         time_sequence=time_sequence,
+        alpha1=1e-2,
+        total_iter=300,
         plot_flag=True,
         print_message=True,
         transmural_flag=True,

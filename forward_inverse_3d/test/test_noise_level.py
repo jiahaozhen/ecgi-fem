@@ -1,14 +1,15 @@
 '''
 检查电压数据噪声水平
 '''
+
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.helper_function import add_noise_based_on_snr, check_noise_level_snr
+from utils.signal_processing_tools import add_noise_based_on_snr, check_noise_level_snr
 
-d_data = np.load('forward_inverse_3d/data/inverse/u_data_reaction_diffusion_normal.npy')
+d_data = np.load('forward_inverse_3d/data/inverse/u_data_normal.npy')
 
-noise = add_noise_based_on_snr(d_data, snr=30)
-noise_level = check_noise_level_snr(d_data, noise-d_data)
+noise = add_noise_based_on_snr(d_data, snr=40)
+noise_level = check_noise_level_snr(d_data, noise - d_data)
 print(f'Noise level SNR:{noise_level} dB')
 
 index = 10

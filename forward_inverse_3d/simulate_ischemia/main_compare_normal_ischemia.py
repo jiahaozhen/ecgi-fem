@@ -1,59 +1,59 @@
 # 基于有限元正过程比较正常心脏与缺血心脏的12导联心电图
-import numpy as np
-from forward_inverse_3d.reaction_diffusion.simulate_reaction_diffusion import compute_v_based_on_reaction_diffusion
-from forward_inverse_3d.forward.forward_coupled_ischemia import compute_d_from_tmp
+from forward_inverse_3d.reaction_diffusion.simulate_reaction_diffusion import (
+    compute_v_based_on_reaction_diffusion,
+)
+from forward_inverse_3d.forward.forward_coupled_matrix_form import compute_d_from_tmp
 from utils.visualize_tools import plot_val_on_mesh, compare_bsp_on_standard12lead
 from utils.simulate_tools import get_activation_dict
 
-mesh_file = r'forward_inverse_3d/data/mesh_multi_conduct_ecgsim.msh'
-
+case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
+case_name = case_name_list[0]
+mesh_file = f'forward_inverse_3d/data/mesh/mesh_{case_name}.msh'
 T = 500
 step_per_timeframe = 8
 
-center_ischemia = np.array([80.4, 19.7, -15.0])
-radius_ischemia = 30
-ischemia_epi_endo = [-1]
+activation_dict = get_activation_dict(case_name, mode='FREEWALL')
 
-activation_dict = get_activation_dict(mesh_file)
+v_data_ischemia, _, _ = compute_v_based_on_reaction_diffusion(
+    mesh_file,
+    ischemia_flag=True,
+    T=T,
+    step_per_timeframe=step_per_timeframe,
+    activation_dict_origin=activation_dict,
+)
+v_data_normal, _, _ = compute_v_based_on_reaction_diffusion(
+    mesh_file,
+    ischemia_flag=False,
+    T=T,
+    step_per_timeframe=step_per_timeframe,
+    activation_dict_origin=activation_dict,
+)
 
-v_data_ischemia, _, _ = compute_v_based_on_reaction_diffusion(mesh_file, 
-                                                              ischemia_flag=True, 
-                                                              T=T,
-                                                              step_per_timeframe=step_per_timeframe,
-                                                              activation_dict_origin=activation_dict)
-v_data_normal, _, _ = compute_v_based_on_reaction_diffusion(mesh_file, 
-                                                            ischemia_flag=False,
-                                                            T=T, 
-                                                            step_per_timeframe=step_per_timeframe,
-                                                            activation_dict_origin=activation_dict)
-d_data_ischemia = compute_d_from_tmp(mesh_file, 
-                                     v_data_ischemia, 
-                                     ischemia_flag=True,
-                                     center_ischemia=center_ischemia,
-                                     ischemia_epi_endo=ischemia_epi_endo,
-                                     radius_ischemia=radius_ischemia)
-d_data_normal = compute_d_from_tmp(mesh_file, 
-                                   v_data_normal, 
-                                   ischemia_flag=False)
-
-np.savez(r'forward_inverse_3d/data/simulate_ischemia/compare_normal_ischemia.npz',
-         v_data_ischemia=v_data_ischemia,
-         d_data_ischemia=d_data_ischemia,
-         v_data_normal=v_data_normal,
-         d_data_normal=d_data_normal)
+d_data_ischemia = compute_d_from_tmp(case_name, v_data_ischemia, allow_cache=True)
+d_data_normal = compute_d_from_tmp(case_name, v_data_normal, allow_cache=True)
 
 import multiprocessing
-p1 = multiprocessing.Process(target=plot_val_on_mesh, 
-                             args=(mesh_file, v_data_ischemia[0]), 
-                             kwargs={"target_cell": 2, 
-                                     "name": "v_ischemia", 
-                                     "title": "v on ventricle with ischemia", 
-                                     "f_val_flag": True})
-p2 = multiprocessing.Process(target=compare_bsp_on_standard12lead, 
-                             args=(d_data_normal, d_data_ischemia), 
-                             kwargs={'labels': ['Normal', 'Ischemia'],
-                                     "step_per_timeframe": step_per_timeframe,
-                                     "filter_flag": False})
+
+p1 = multiprocessing.Process(
+    target=plot_val_on_mesh,
+    args=(mesh_file, v_data_ischemia[0]),
+    kwargs={
+        "target_cell": 2,
+        "name": "v_ischemia",
+        "title": "v on ventricle with ischemia",
+        "f_val_flag": True,
+    },
+)
+p2 = multiprocessing.Process(
+    target=compare_bsp_on_standard12lead,
+    args=(d_data_normal, d_data_ischemia),
+    kwargs={
+        'case_name': case_name,
+        'labels': ['Normal', 'Ischemia'],
+        "step_per_timeframe": step_per_timeframe,
+        "filter_flag": False,
+    },
+)
 p1.start()
 p2.start()
 

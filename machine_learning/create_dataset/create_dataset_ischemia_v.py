@@ -28,18 +28,21 @@ from utils.simulate_tools import get_activation_dict
 
 # Function to generate ischemia data
 def generate_ischemia_data(
-    mesh_file,
-    save_dir,
+    case_name,
+    severity,
+    save_dir_prefix='machine_learning/data/Ischemia_Dataset/',
     gdim=3,
     T=500,
     step_per_timeframe=1,
     save_interval=200,
     partial_idx=0,
 ):
+    save_dir = os.path.join(save_dir_prefix, f"{case_name}/{severity}/v_dataset/")
     os.makedirs(save_dir, exist_ok=True)
     logging.info("开始生成心肌缺血数据集")
+    mesh_file = f'forward_inverse_3d/data/mesh/mesh_{case_name}.msh'
 
-    activation_dict = get_activation_dict(mesh_file, mode='ENDO', threshold=40)
+    activation_dict = get_activation_dict(case_name, mode='FREEWALL')
 
     segment_ids = lv_17_segmentation_from_mesh(mesh_file, gdim=gdim)
     domain, cell_markers, _ = gmshio.read_from_msh(mesh_file, MPI.COMM_WORLD, gdim=gdim)
@@ -50,10 +53,15 @@ def generate_ischemia_data(
     center_segment_ids = segment_ids[valid_mask]
 
     # 参数定义
-    radius_ischemia_list = [0, 15, 30]
-    ischemia_epi_endo_list = [[1, 0], [0, 1], [-1, 0, 1]]
-    u_peak_ischemia_val_list = [0.9, 0.8]
-    u_rest_ischemia_val_list = [0.1, 0.2]
+    ischemia_epi_endo_list = [[1, 0], [0, 1], [-1, 0, 1], [-2]]
+    if severity == 'mild':
+        radius_ischemia_list = [15]
+        u_peak_ischemia_val_list = [0.9]
+        u_rest_ischemia_val_list = [0.1]
+    else:
+        radius_ischemia_list = [30]
+        u_peak_ischemia_val_list = [0.8]
+        u_rest_ischemia_val_list = [0.2]
     all_v_results = []
     all_seg_ids = []
 
@@ -86,7 +94,9 @@ def generate_ischemia_data(
                                 activation_dict_origin=activation_dict,
                             )
                             all_v_results.append(v)
-                            all_seg_ids.append(seg_id)
+                            all_seg_ids.append(
+                                seg_id if ischemia_epi_endo != [-2] else -1
+                            )
                             pbar.update(1)
 
                             if len(all_v_results) >= save_interval:
@@ -108,7 +118,7 @@ def generate_ischemia_data(
 def save_partial_data(v_results, seg_ids, save_dir, partial_idx):
     X = np.array(v_results)
     y = np.array(seg_ids)
-    partial_file = os.path.join(save_dir, f"ischemia_v_part_{partial_idx:03d}.h5")
+    partial_file = os.path.join(save_dir, f"v_part_{partial_idx:03d}.h5")
     with h5py.File(partial_file, "w") as f:
         f.create_dataset("X", data=X, compression="gzip")
         f.create_dataset("y", data=y, compression="gzip")
@@ -117,8 +127,7 @@ def save_partial_data(v_results, seg_ids, save_dir, partial_idx):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    generate_ischemia_data(
-        mesh_file='forward_inverse_3d/data/mesh_multi_conduct_ecgsim.msh',
-        save_dir='machine_learning/data/dataset_dl/v_dataset',
-        # save_dir='machine_learning/data/dataset_ml/v_dataset',
-    )
+    case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
+    for severity in ['mild', 'severe']:
+        for case_name in case_name_list:
+            generate_ischemia_data(case_name=case_name, severity=severity)

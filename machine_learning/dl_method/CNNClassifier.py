@@ -1,5 +1,10 @@
 import torch.nn as nn
 import torch.nn.functional as F
+from utils.deep_learning_tools import (
+    build_train_test_loaders,
+    train_model,
+    evaluate_model,
+)
 
 
 # --------------------
@@ -52,29 +57,19 @@ class ImprovedCNN(nn.Module):
 # Main
 # --------------------
 if __name__ == "__main__":
-    from utils.machine_learning_tools import (
-        load_dataset,
-        split_dataset,
-        train_model,
-        evaluate_model_dl,
-        build_dataloader,
+    data_dir = (
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/"
     )
 
-    data_dir = 'machine_learning/data/dataset/d6_standard_dataset'
-    X, y = load_dataset(data_dir)
+    # 🔥 使用你之前写好的随机划分函数
+    train_loader, test_loader = build_train_test_loaders(
+        data_dir=data_dir, batch_size=32, test_ratio=0.2, num_workers=4
+    )
 
-    X_train, X_test, y_train, y_test = split_dataset(X, y)
-
-    # Detect input_dim
-    if X_train.ndim == 3:
-        input_dim = X_train.shape[2]
-    else:
-        X_train = X_train[:, None, :]
-        X_test = X_test[:, None, :]
-        input_dim = X_train.shape[2]
-
-    train_loader = build_dataloader(X_train, y_train)
+    # 自动推断 input_dim（从 train_loader 第一个 batch）
+    X_sample, _ = next(iter(train_loader))
+    input_dim = X_sample.shape[-1]
 
     model = ImprovedCNN(input_dim)
     model = train_model(model, train_loader, epochs=30, lr=1e-3)
-    evaluate_model_dl(model, X_test, y_test)
+    evaluate_model(model, test_loader)

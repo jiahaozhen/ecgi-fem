@@ -2,43 +2,42 @@ import time
 from machine_learning.dl_method.BiGRUClassifier import BiGRUClassifier
 from machine_learning.dl_method.BiLSTMClassifier import BiLSTMClassifier
 from machine_learning.dl_method.CNNClassifier import ImprovedCNN
-from machine_learning.dl_method.MLPClassifier import MLPClassifier
 from machine_learning.dl_method.TCNClassifier import TCNClassifier
 from machine_learning.dl_method.TransformerClassifier import TransformerClassifier
-from utils.machine_learning_tools import (
-    load_dataset,
-    split_dataset,
-    build_dataloader,
+from utils.deep_learning_tools import (
+    build_train_test_loaders,
     train_model,
-    evaluate_model_dl,
+    evaluate_model,
 )
+
 
 methods = [
     ('BiGRUClassifier', BiGRUClassifier),
     ('BiLSTMClassifier', BiLSTMClassifier),
     ('ImprovedCNN', ImprovedCNN),
-    ('MLPClassifier', MLPClassifier),
     ('TCNClassifier', TCNClassifier),
     ('TransformerClassifier', TransformerClassifier),
 ]
-DATA_DIR = 'machine_learning/data/dataset/d6_standard_dataset'
 
 
 def test_all_classifiers():
-    X, y = load_dataset(DATA_DIR)
-    X_train, X_test, y_train, y_test = split_dataset(X, y)
+    data_dir = [
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+    ]
 
-    # Detect input_dim
-    if X_train.ndim == 3:
-        input_dim = X_train.shape[2]
-    else:
-        X_train = X_train[:, None, :]
-        X_test = X_test[:, None, :]
-        input_dim = X_train.shape[2]
+    # 🔥 使用你之前写好的随机划分函数
+    train_loader, test_loader = build_train_test_loaders(
+        data_dir=data_dir, batch_size=32, test_ratio=0.2, num_workers=4
+    )
+
+    # 自动推断 input_dim（从 train_loader 第一个 batch）
+    X_sample, _ = next(iter(train_loader))
+    input_dim = X_sample.shape[-1]
+
     results = []
 
     for name, method in methods:
-        train_loader = build_dataloader(X_train, y_train)
         print(f'\n训练 {name}...')
         start_time = time.time()
         try:
@@ -48,7 +47,7 @@ def test_all_classifiers():
             print(f'{name}: 训练时间 = {elapsed:.4f}s')
             # 评估模型并记录准确度
             print(f'{name} 测试结果:')
-            acc = evaluate_model_dl(model, X_test, y_test)
+            acc = evaluate_model(model, test_loader)
             print('Accuracy:', acc)
             results.append(
                 {'method': name, 'time': elapsed, 'accuracy': acc, 'error': None}

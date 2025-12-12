@@ -1,4 +1,9 @@
 import torch.nn as nn
+from utils.deep_learning_tools import (
+    build_train_test_loaders,
+    train_model,
+    evaluate_model,
+)
 
 
 # --------------------
@@ -12,16 +17,14 @@ class GRUBlock(nn.Module):
             hidden_dim,
             num_layers=num_layers,
             batch_first=True,
-            dropout=dropout,
+            dropout=dropout if num_layers > 1 else 0.0,
             bidirectional=True,
         )
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        # x: (B, T, D)
         out, _ = self.gru(x)
-        out = self.dropout(out)
-        return out
+        return self.dropout(out)
 
 
 # --------------------
@@ -31,13 +34,12 @@ class BiGRUClassifier(nn.Module):
     def __init__(self, input_dim, n_classes=17, hidden_dim=128, num_layers=2):
         super().__init__()
         self.bigru = GRUBlock(input_dim, hidden_dim, num_layers)
-        self.fc = nn.Linear(hidden_dim * 2, n_classes)
         self.dropout = nn.Dropout(0.5)
+        self.fc = nn.Linear(hidden_dim * 2, n_classes)
 
     def forward(self, x):
-        # x: (B, T, D)
-        out = self.bigru(x)
-        out = out.mean(dim=1)  # Global Average Pooling over time
+        out = self.bigru(x)  # (B, T, 2H)
+        out = out.mean(dim=1)  # GAP
         out = self.dropout(out)
         return self.fc(out)
 
@@ -46,28 +48,26 @@ class BiGRUClassifier(nn.Module):
 # Main
 # --------------------
 if __name__ == "__main__":
-    from utils.machine_learning_tools import (
-        load_dataset,
-        split_dataset,
-        train_model,
-        evaluate_model_dl,
-        build_dataloader,
+
+    data_dir = [
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+    ]
+
+    # 🔥 使用你之前写好的随机划分函数
+    train_loader, test_loader = build_train_test_loaders(
+        data_dir=data_dir, batch_size=32, test_ratio=0.2, num_workers=4
     )
 
-    data_dir = 'machine_learning/data/dataset/d6_standard_dataset'
-    X, y = load_dataset(data_dir)
-    X_train, X_test, y_train, y_test = split_dataset(X, y)
+    # 自动推断 input_dim（从 train_loader 第一个 batch）
+    X_sample, _ = next(iter(train_loader))
+    input_dim = X_sample.shape[-1]
 
-    # Detect input_dim
-    if X_train.ndim == 3:
-        input_dim = X_train.shape[2]
-    else:
-        X_train = X_train[:, None, :]
-        X_test = X_test[:, None, :]
-        input_dim = X_train.shape[2]
+    # 构建模型
+    model = BiGRUClassifier(input_dim=input_dim)
 
-    train_loader = build_dataloader(X_train, y_train)
-
-    model = BiGRUClassifier(input_dim)
+    # 训练
     model = train_model(model, train_loader, epochs=30, lr=1e-3)
-    evaluate_model_dl(model, X_test, y_test)
+
+    # 测试
+    evaluate_model(model, test_loader)

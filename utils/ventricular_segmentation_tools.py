@@ -214,7 +214,9 @@ def assign_segment(hi, theta_deg):
     else:
         return 16  # segment 17 (apex cap)
 
-    theta_deg = (theta_deg + 360) % 360
+    theta_offset = 60 if hi < 0.66 else 45
+
+    theta_deg = (theta_deg + 360 - theta_offset) % 360
     seg = int(theta_deg / (360 / n_seg)) + offset
     return seg
 

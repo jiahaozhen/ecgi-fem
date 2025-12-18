@@ -2,19 +2,29 @@
 import os
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import (
+    classification_report,
+    accuracy_score,
+    f1_score,
+    hamming_loss,
+)
 import h5py
 
 
 def load_dataset(data_dir):
-    file_list = sorted([f for f in os.listdir(data_dir) if f.endswith('.h5')])
+    if isinstance(data_dir, str):
+        data_dir = [data_dir]
+
     X_list, y_list = [], []
-    for fname in file_list:
-        with h5py.File(os.path.join(data_dir, fname), 'r') as data:
-            X = data['X'][:] if 'X' in data else data[list(data.keys())[0]]
-            y = data['y'][:] if 'y' in data else data[list(data.keys())[-1]]
-            X_list.append(X)
-            y_list.append(y)
+
+    for d in data_dir:
+        assert os.path.isdir(d), f"{d} not found"
+
+        for f in sorted(os.listdir(d)):
+            if f.endswith(".h5"):
+                with h5py.File(os.path.join(d, f), "r") as data:
+                    X_list.append(data["X"][:])
+                    y_list.append(data["y"][:])
     X = np.vstack(X_list)
     y = np.concatenate(y_list)
     if X.ndim == 3:
@@ -29,7 +39,11 @@ def exclude_classes(X, y, exclude_labels):
 
 def split_dataset(X, y, test_size=0.2, random_state=42):
     return train_test_split(
-        X, y, test_size=test_size, random_state=random_state, stratify=y
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        shuffle=True,
     )
 
 
@@ -42,7 +56,18 @@ def get_train_test(data_dir, test_size=0.2, random_state=42, test_only=False):
         return split_dataset(X, y, test_size=test_size, random_state=random_state)
 
 
-def evaluate_model(clf, X_test, y_test):
-    y_pred_label = clf.predict(X_test)
-    print('Accuracy:', accuracy_score(y_test, y_pred_label))
-    print(classification_report(y_test, y_pred_label, digits=4))
+def evaluate_model(clf, X_test, y_test, threshold=0.5):
+    # 1️⃣ 预测概率（每个标签一个概率）
+    if hasattr(clf, "predict_proba"):
+        y_score = clf.predict_proba(X_test)
+        y_pred = (y_score >= threshold).astype(int)
+    else:
+        y_score = clf.decision_function(X_test)
+        y_pred = (y_score > 0).astype(int)
+
+    # 3️⃣ 评估
+    print("Threshold:", threshold)
+    print("Hamming loss:", hamming_loss(y_test, y_pred))
+    print("Micro F1:", f1_score(y_test, y_pred, average="micro"))
+    print("Macro F1:", f1_score(y_test, y_pred, average="macro"))
+    print(classification_report(y_test, y_pred, digits=4))

@@ -22,7 +22,11 @@ from tqdm import tqdm
 from forward_inverse_3d.reaction_diffusion.simulate_reaction_diffusion import (
     compute_v_based_on_reaction_diffusion,
 )
-from utils.ventricular_segmentation_tools import lv_17_segmentation_from_mesh
+from utils.ventricular_segmentation_tools import (
+    distinguish_epi_endo,
+    lv_17_segmentation_from_mesh,
+    get_ischemia_segment,
+)
 from utils.simulate_tools import get_activation_dict
 
 
@@ -50,10 +54,10 @@ def generate_ischemia_data(
     subdomain_ventricle, _, _, _ = create_submesh(domain, tdim, cell_markers.find(2))
     valid_mask = segment_ids != -1
     center_ischemia_list = subdomain_ventricle.geometry.x[valid_mask]
-    center_segment_ids = segment_ids[valid_mask]
+    epi_endo_marker = distinguish_epi_endo(mesh_file, gdim=gdim)
 
     # 参数定义
-    ischemia_epi_endo_list = [[1, 0], [0, 1], [-1, 0, 1], [-2]]
+    ischemia_epi_endo_list = [[1, 0], [0, 1], [-1, 0, 1]]
     if severity == 'mild':
         radius_ischemia_list = [15]
         u_peak_ischemia_val_list = [0.9]
@@ -73,7 +77,7 @@ def generate_ischemia_data(
     )
 
     with tqdm(total=total_loops, desc="生成心肌缺血数据集", dynamic_ncols=True) as pbar:
-        for center_ischemia, seg_id in zip(center_ischemia_list, center_segment_ids):
+        for center_ischemia in center_ischemia_list:
             for radius_ischemia in radius_ischemia_list:
                 for ischemia_epi_endo in ischemia_epi_endo_list:
                     for u_peak_ischemia_val, u_rest_ischemia_val in zip(
@@ -94,9 +98,15 @@ def generate_ischemia_data(
                                 activation_dict_origin=activation_dict,
                             )
                             all_v_results.append(v)
-                            all_seg_ids.append(
-                                seg_id if ischemia_epi_endo != [-2] else -1
+                            label = get_ischemia_segment(
+                                subdomain_ventricle.geometry.x,
+                                segment_ids,
+                                epi_endo_marker,
+                                center_ischemia,
+                                radius_ischemia,
+                                ischemia_epi_endo,
                             )
+                            all_seg_ids.append(label)
                             pbar.update(1)
 
                             if len(all_v_results) >= save_interval:
@@ -127,7 +137,7 @@ def save_partial_data(v_results, seg_ids, save_dir, partial_idx):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
+    case_name_list = ['normal_male', 'normal_male2']
     for severity in ['mild', 'severe']:
         for case_name in case_name_list:
             generate_ischemia_data(case_name=case_name, severity=severity)

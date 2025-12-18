@@ -71,7 +71,7 @@ def create_standard_d_dataset(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
-    for severity in ['mild', 'severe']:
+    case_name_list = ['normal_male', 'normal_male2']
+    for severity in ['mild', 'severe', 'healthy']:
         for case_name in case_name_list:
             create_standard_d_dataset(case_name=case_name, severity=severity)

@@ -362,3 +362,46 @@ def get_free_wall_region(
     free_wall_pts = np.vstack([lv_freewall_pts, rv_freewall_pts])
 
     return free_wall_pts
+
+
+def get_ischemia_segment(
+    ventricle_pts,
+    seg_ids,
+    epi_endo_marker,
+    center_ischemia,
+    radius_ischemia,
+    epi_endo_ischemia,
+    ratio_threshold=0.2,
+):
+    allowed_layers = np.asarray(epi_endo_ischemia)
+    layer_mask = np.isin(epi_endo_marker, allowed_layers)
+
+    valid_mask = layer_mask & (seg_ids != -1)
+
+    lv_pts_layer = ventricle_pts[valid_mask]
+    seg_ids_layer = seg_ids[valid_mask]
+
+    n_seg = len(np.unique(seg_ids)) - 1
+    label = np.zeros(n_seg, dtype=np.int64)
+
+    if len(lv_pts_layer) == 0:
+        return label.tolist()
+
+    # ---------- 2. 空间缺血区域 ----------
+    tree = cKDTree(lv_pts_layer)
+    indices = tree.query_ball_point(center_ischemia, radius_ischemia)
+
+    if len(indices) == 0:
+        return label.tolist()
+
+    seg_ids_in_region = seg_ids_layer[indices]
+
+    # ---------- 3. segment 内比例判断 ----------
+    for seg in np.unique(seg_ids_in_region):
+        total_pts = np.sum(seg_ids_layer == seg)
+        ischemia_pts = np.sum(seg_ids_in_region == seg)
+
+        if ischemia_pts / total_pts >= ratio_threshold:
+            label[int(seg)] = 1
+
+    return label.tolist()

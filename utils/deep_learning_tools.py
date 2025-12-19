@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.utils.data import random_split, DataLoader, Dataset
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report, hamming_loss, f1_score
 
 
 import os
@@ -16,46 +16,35 @@ from torch.utils.data import Dataset
 class H5Dataset(Dataset):
     def __init__(self, data_dirs, transform=None):
         """
-        data_dirs: str 或 [str]
+        data_dirs: str 或 list[str]
             一个或多个包含 .h5 文件的目录
         """
-        # ----------- 处理多个目录 -----------
         if isinstance(data_dirs, str):
             data_dirs = [data_dirs]
 
-        # 收集所有目录中的 h5 文件
+        # 收集所有 h5 文件
         self.data_files = []
         for d in data_dirs:
-            h5_files = [os.path.join(d, f) for f in os.listdir(d) if f.endswith('.h5')]
-            self.data_files.extend(h5_files)
+            self.data_files.extend(
+                [os.path.join(d, f) for f in os.listdir(d) if f.endswith(".h5")]
+            )
 
         self.data_files = sorted(self.data_files)
-
         if len(self.data_files) == 0:
             raise ValueError(f"No .h5 files found in: {data_dirs}")
 
         self.transform = transform
 
-        # ----------- 构建 index_map -----------
-        self.index_map = []  # [(file_idx, sample_idx), ...]
-        self.file_sample_counts = []  # 每个文件的样本数
+        # ----------- 构建 index_map（不做任何过滤） -----------
+        self.index_map = []  # (file_idx, sample_idx)
 
         for f_idx, fpath in enumerate(self.data_files):
             with h5py.File(fpath, "r") as f:
-                X = f["X"] if "X" in f else f[list(f.keys())[0]]
-                n_samples = X.shape[0]
-
-                # 读取 y，过滤掉 -1
-                if "y" in f:
-                    y = f["y"][:]
-                else:
-                    y = -1 * torch.ones(n_samples)
+                X_key = "X" if "X" in f else list(f.keys())[0]
+                n_samples = f[X_key].shape[0]
 
                 for i in range(n_samples):
-                    if y[i] != -1:
-                        self.index_map.append((f_idx, i))
-
-                self.file_sample_counts.append(n_samples)
+                    self.index_map.append((f_idx, i))
 
     def __len__(self):
         return len(self.index_map)
@@ -110,41 +99,56 @@ def build_train_test_loaders(
 
 def train_model(model, loader, epochs=30, lr=1e-3, device="cuda"):
     model.to(device)
-    optim = torch.optim.Adam(model.parameters(), lr=lr)
-    loss_fn = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.BCEWithLogitsLoss()
 
     model.train()
     for epoch in range(epochs):
         total_loss = 0.0
-
         for X, y in loader:
-            X, y = X.to(device), y.to(device)
+            X = X.to(device)
+            y = y.to(device).float()  # (B, n_classes)
 
-            optim.zero_grad()
-            pred = model(X)
-            loss = loss_fn(pred, y)
+            optimizer.zero_grad()
+            logits = model(X)  # (B, n_classes)
+            loss = criterion(logits, y)
             loss.backward()
-            optim.step()
+            optimizer.step()
 
             total_loss += loss.item()
 
-        print(f"Epoch {epoch+1}/{epochs} | Loss: {total_loss / len(loader):.4f}")
+        print(f"Epoch [{epoch+1}/{epochs}] Loss: {total_loss / len(loader):.4f}")
 
     return model
 
 
-def evaluate_model(model, loader, device="cuda"):
+def evaluate_model(model, loader, threshold=0.5, device="cuda"):
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
     model.eval()
-    correct = 0
-    total = 0
+    model.to(device)
+
+    all_preds = []
+    all_targets = []
 
     with torch.no_grad():
         for X, y in loader:
-            X, y = X.to(device), y.to(device)
-            pred = model(X)
-            pred_label = pred.argmax(dim=1)
-            correct += (pred_label == y).sum().item()
-            total += y.size(0)
+            X = X.to(device)
+            y = y.to(device)
 
-    print(f"Test Accuracy: {correct / total:.4f}")
-    return correct / total
+            logits = model(X)
+            probs = torch.sigmoid(logits)
+            preds = (probs > threshold).int()
+
+            all_preds.append(preds.cpu())
+            all_targets.append(y.cpu())
+
+    y_pred = torch.cat(all_preds).numpy()
+    y_true = torch.cat(all_targets).numpy()
+    print("Hamming loss:", hamming_loss(y_true, y_pred))
+    print("Micro F1:", f1_score(y_true, y_pred, average="micro"))
+    print("Macro F1:", f1_score(y_true, y_pred, average="macro"))
+    print(classification_report(y_true, y_pred, digits=4, zero_division=0))
+
+    return f1_score(y_true, y_pred, average="macro")

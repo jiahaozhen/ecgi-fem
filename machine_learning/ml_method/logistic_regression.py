@@ -23,6 +23,11 @@ def multilabel_logistic_classifier(X_train, y_train):
 if __name__ == "__main__":
     data_dir = [
         "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
     ]
 
     X, y = load_dataset(data_dir)

@@ -39,9 +39,10 @@ class BiGRUClassifier(nn.Module):
 
     def forward(self, x):
         out = self.bigru(x)  # (B, T, 2H)
-        out = out.mean(dim=1)  # GAP
+        out = out.mean(dim=1)  # Global Average Pooling
         out = self.dropout(out)
-        return self.fc(out)
+        logits = self.fc(out)
+        return logits
 
 
 # --------------------
@@ -51,7 +52,11 @@ if __name__ == "__main__":
 
     data_dir = [
         "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
         "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
     ]
 
     # 🔥 使用你之前写好的随机划分函数
@@ -65,9 +70,5 @@ if __name__ == "__main__":
 
     # 构建模型
     model = BiGRUClassifier(input_dim=input_dim)
-
-    # 训练
     model = train_model(model, train_loader, epochs=30, lr=1e-3)
-
-    # 测试
     evaluate_model(model, test_loader)

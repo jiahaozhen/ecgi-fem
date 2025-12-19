@@ -1,6 +1,8 @@
 import time
 from machine_learning.dl_method.BiGRUClassifier import BiGRUClassifier
 from machine_learning.dl_method.BiLSTMClassifier import BiLSTMClassifier
+from machine_learning.dl_method.CNNBiLSTM import CNNBiLSTM
+from machine_learning.dl_method.CNNTransformer import CNNTransformer
 from machine_learning.dl_method.CNNClassifier import ImprovedCNN
 from machine_learning.dl_method.TCNClassifier import TCNClassifier
 from machine_learning.dl_method.TransformerClassifier import TransformerClassifier
@@ -15,6 +17,8 @@ methods = [
     ('BiGRUClassifier', BiGRUClassifier),
     ('BiLSTMClassifier', BiLSTMClassifier),
     ('ImprovedCNN', ImprovedCNN),
+    ('CNNBiLSTM', CNNBiLSTM),
+    ('CNNTransformer', CNNTransformer),
     ('TCNClassifier', TCNClassifier),
     ('TransformerClassifier', TransformerClassifier),
 ]
@@ -23,7 +27,11 @@ methods = [
 def test_all_classifiers():
     data_dir = [
         "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
         "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
     ]
 
     # 🔥 使用你之前写好的随机划分函数
@@ -47,15 +55,15 @@ def test_all_classifiers():
             print(f'{name}: 训练时间 = {elapsed:.4f}s')
             # 评估模型并记录准确度
             print(f'{name} 测试结果:')
-            acc = evaluate_model(model, test_loader)
-            print('Accuracy:', acc)
+            f1_score = evaluate_model(model, test_loader)
+            print('f1_score:', f1_score)
             results.append(
-                {'method': name, 'time': elapsed, 'accuracy': acc, 'error': None}
+                {'method': name, 'time': elapsed, 'f1_score': f1_score, 'error': None}
             )
         except Exception as e:
             elapsed = time.time() - start_time
             results.append(
-                {'method': name, 'time': elapsed, 'accuracy': None, 'error': str(e)}
+                {'method': name, 'time': elapsed, 'f1_score': None, 'error': str(e)}
             )
             print(f'{name}: 错误: {e}')
 

@@ -47,9 +47,9 @@ class TransformerClassifier(nn.Module):
         x = self.proj(x)
         for block in self.blocks:
             x = block(x)
-        x = x.mean(dim=1)  # Global Average Pooling over time
+        x = x.mean(dim=1)
         x = self.dropout(x)
-        return self.fc(x)
+        return self.fc(x)  # logits (B, n_classes)
 
 
 # --------------------
@@ -58,7 +58,11 @@ class TransformerClassifier(nn.Module):
 if __name__ == "__main__":
     data_dir = [
         "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
         "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
     ]
 
     # 🔥 使用你之前写好的随机划分函数
@@ -69,6 +73,7 @@ if __name__ == "__main__":
     # 自动推断 input_dim（从 train_loader 第一个 batch）
     X_sample, _ = next(iter(train_loader))
     input_dim = X_sample.shape[-1]
+
     model = TransformerClassifier(input_dim)
     model = train_model(model, train_loader, epochs=30, lr=1e-3)
     evaluate_model(model, test_loader)

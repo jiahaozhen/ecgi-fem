@@ -1,33 +1,45 @@
-import xgboost as xgb
+from xgboost import XGBClassifier
+from sklearn.multiclass import OneVsRestClassifier
+
 from utils.machine_learning_tools import (
     load_dataset,
-    exclude_classes,
     split_dataset,
     evaluate_model,
 )
 
 
-def xgb_classifier(X_train, y_train):
-    clf = xgb.XGBClassifier(
-        objective='multi:softmax',
-        num_class=17,
-        learning_rate=0.05,
-        n_estimators=100,
-        max_depth=6,
-        verbosity=0,
-        tree_method='auto',
-        eval_metric='mlogloss',
+def multilabel_xgb_classifier(X_train, y_train):
+    base_clf = XGBClassifier(
+        objective="binary:logistic",
+        eval_metric="logloss",
+        n_estimators=120,  # 300 → 120
+        max_depth=4,  # 6 → 4
+        learning_rate=0.1,  # 0.05 → 0.1
+        subsample=0.8,
+        colsample_bytree=0.8,
+        tree_method="hist",
+        n_jobs=2,
     )
+
+    clf = OneVsRestClassifier(base_clf)
     clf.fit(X_train, y_train)
     return clf
 
 
-if __name__ == '__main__':
-    data_dir = (
-        'machine_learning/data/Ischemia_Dataset/normal_male/mild/d12_processed_dataset/'
-    )
+if __name__ == "__main__":
+    data_dir = [
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
+    ]
+
     X, y = load_dataset(data_dir)
-    X, y = exclude_classes(X, y, exclude_labels=[-1])
+
     X_train, X_test, y_train, y_test = split_dataset(X, y)
-    clf = xgb_classifier(X_train, y_train)
+
+    clf = multilabel_xgb_classifier(X_train, y_train)
+
     evaluate_model(clf, X_test, y_test)

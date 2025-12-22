@@ -281,7 +281,9 @@ def build_M(
     return M
 
 
-def get_activation_dict(case_name, target_marker=2, gdim=3, mode='ENDO', threshold=100):
+def get_activation_dict(
+    case_name, target_marker=2, gdim=3, mode='ENDO', threshold=100, add_noise=False
+):
 
     from dolfinx.io import gmshio
     from mpi4py import MPI
@@ -344,13 +346,13 @@ def get_activation_dict(case_name, target_marker=2, gdim=3, mode='ENDO', thresho
 
     if target_coords is not None:
         activation_dict = compute_full_activation_dict(
-            activation_dict, target_coords, threshold
+            activation_dict, target_coords, threshold, add_noise
         )
 
     return activation_dict
 
 
-def compute_full_activation_dict(activation_dict, pts, threshold, power=2.0):
+def compute_full_activation_dict(activation_dict, pts, threshold, add_noise, power=2.0):
     """
     使用 IDW (Inverse Distance Weighting) 对 pts 进行激活时间插值。
     不再使用 activation_dict 的 key 做插值点，只用它存的三维坐标。
@@ -374,6 +376,11 @@ def compute_full_activation_dict(activation_dict, pts, threshold, power=2.0):
     # ---- 提取已知的时间与坐标 ----
     known_times = np.array(list(activation_dict.keys()), dtype=float)  # (M,)
     known_pts = np.array(list(activation_dict.values()), dtype=float)  # (M,3)
+
+    if add_noise:
+        from .signal_processing_tools import add_noise_based_on_snr
+
+        known_times = add_noise_based_on_snr(known_times, snr=30)
 
     # ---- 保证 pts 形状正确 ----
     pts = np.asarray(pts, dtype=float)

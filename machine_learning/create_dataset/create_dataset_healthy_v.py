@@ -25,27 +25,29 @@ def generate_ischemia_data(
     logging.info("开始生成心肌缺血数据集")
     mesh_file = f'forward_inverse_3d/data/mesh/mesh_{case_name}.msh'
 
-    activation_dict = get_activation_dict(case_name, mode='FREEWALL')
-
     all_v_results = []
     all_seg_ids = []
 
     num_cases = 100
 
-    v, _, _ = compute_v_based_on_reaction_diffusion(
-        mesh_file,
-        gdim=gdim,
-        T=T,
-        step_per_timeframe=step_per_timeframe,
-        activation_dict_origin=activation_dict,
-    )
-
     for case_idx in tqdm(range(num_cases), desc="生成健康心脏数据"):
         try:
 
+            activation_dict = get_activation_dict(
+                case_name, mode='FREEWALL', add_noise=True
+            )
+
+            v, _, _ = compute_v_based_on_reaction_diffusion(
+                mesh_file,
+                gdim=gdim,
+                T=T,
+                step_per_timeframe=step_per_timeframe,
+                activation_dict_origin=activation_dict,
+            )
+
             label = np.zeros(17, dtype=np.int64)
 
-            all_v_results.append(v.copy())
+            all_v_results.append(v)
 
             all_seg_ids.append(label.tolist())
 

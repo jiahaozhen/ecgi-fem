@@ -125,7 +125,7 @@ def separate_lv_rv(mesh_file, gdim=3):
     # 7. 对每个 ventricle 点计算 apex->point 的方向向量
     vecs = ventricle_pts - apex
     vecs_norm = np.linalg.norm(vecs, axis=1, keepdims=True)
-    vecs = vecs / vecs_norm
+    vecs = vecs / (vecs_norm + 1e-8)
 
     # 8. 判断点更靠近左侧还是右侧（根据角度余弦）
     cosL = np.sum(vecs * vL, axis=1)
@@ -381,7 +381,7 @@ def get_ischemia_segment(
     lv_pts_layer = ventricle_pts[valid_mask]
     seg_ids_layer = seg_ids[valid_mask]
 
-    n_seg = len(np.unique(seg_ids)) - 1
+    n_seg = 17
     label = np.zeros(n_seg, dtype=np.int64)
 
     if len(lv_pts_layer) == 0:
@@ -401,7 +401,7 @@ def get_ischemia_segment(
         total_pts = np.sum(seg_ids_layer == seg)
         ischemia_pts = np.sum(seg_ids_in_region == seg)
 
-        if ischemia_pts / total_pts >= ratio_threshold:
+        if ischemia_pts / total_pts > ratio_threshold:
             label[int(seg)] = 1
 
     return label.tolist()

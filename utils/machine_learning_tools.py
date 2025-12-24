@@ -1,4 +1,3 @@
-# ----------------- 机器学习通用工具 -----------------
 import os
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -27,14 +26,13 @@ def load_dataset(data_dir):
                     y_list.append(data["y"][:])
     X = np.vstack(X_list)
     y = np.concatenate(y_list)
-    if X.ndim == 3:
-        X = X.reshape(X.shape[0], -1)
     return X, y
 
 
-def exclude_classes(X, y, exclude_labels):
-    mask = ~np.isin(y, exclude_labels)
-    return X[mask], y[mask]
+def flatten_data(data: np.ndarray):
+    if data.ndim == 3:
+        data = data.reshape(data.shape[0], -1)
+    return data
 
 
 def split_dataset(X, y, test_size=0.2, random_state=42):
@@ -65,9 +63,21 @@ def evaluate_model(clf, X_test, y_test, threshold=0.5):
         y_score = clf.decision_function(X_test)
         y_pred = (y_score > 0).astype(int)
 
+    h_loss = hamming_loss(y_test, y_pred)
+    f1_score_micro = f1_score(y_test, y_pred, average="micro")
+    f1_score_macro = f1_score(y_test, y_pred, average="macro")
+    a_score = accuracy_score(y_test, y_pred)
+
     # 3️⃣ 评估
-    print("Threshold:", threshold)
-    print("Hamming loss:", hamming_loss(y_test, y_pred))
-    print("Micro F1:", f1_score(y_test, y_pred, average="micro"))
-    print("Macro F1:", f1_score(y_test, y_pred, average="macro"))
-    print(classification_report(y_test, y_pred, digits=4))
+    print("Hamming loss:", h_loss)
+    print("Micro F1:", f1_score_micro)
+    print("Macro F1:", f1_score_macro)
+    print("Accuracy Score:", a_score)
+    # print(classification_report(y_test, y_pred, digits=4))
+
+    return {
+        "Hamming loss": h_loss,
+        "Micro F1": f1_score_micro,
+        "Macro F1": f1_score_macro,
+        "accuracy score": a_score,
+    }

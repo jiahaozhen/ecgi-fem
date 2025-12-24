@@ -25,14 +25,16 @@ methods = [
 
 
 def test_all_classifiers():
-    data_dir = [
-        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
-    ]
+    # data_dir = [
+    #     "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
+    # ]
+
+    data_dir = ["machine_learning/data/Ischemia_Dataset_DR_no_flatten/"]
 
     # 🔥 使用你之前写好的随机划分函数
     train_loader, test_loader = build_train_test_loaders(
@@ -43,7 +45,7 @@ def test_all_classifiers():
     X_sample, _ = next(iter(train_loader))
     input_dim = X_sample.shape[-1]
 
-    results = []
+    results = {}
 
     for name, method in methods:
         print(f'\n训练 {name}...')
@@ -55,21 +57,15 @@ def test_all_classifiers():
             print(f'{name}: 训练时间 = {elapsed:.4f}s')
             # 评估模型并记录准确度
             print(f'{name} 测试结果:')
-            f1_score = evaluate_model(model, test_loader)
-            print('f1_score:', f1_score)
-            results.append(
-                {'method': name, 'time': elapsed, 'f1_score': f1_score, 'error': None}
-            )
+            metrics = evaluate_model(model, test_loader)
+            results[name] = metrics
         except Exception as e:
             elapsed = time.time() - start_time
-            results.append(
-                {'method': name, 'time': elapsed, 'f1_score': None, 'error': str(e)}
-            )
             print(f'{name}: 错误: {e}')
 
     print('\n训练完成:')
-    for r in results:
-        print(r)
+    for name, metrics in results.items():
+        print(f"Method: {name}, Metrics: {metrics}")
 
 
 if __name__ == '__main__':

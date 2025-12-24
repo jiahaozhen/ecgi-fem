@@ -8,18 +8,23 @@ from machine_learning.ml_method.logistic_regression import (
     multilabel_logistic_classifier,
 )
 
-from utils.machine_learning_tools import load_dataset, exclude_classes, split_dataset
+from utils.machine_learning_tools import load_dataset, split_dataset, evaluate_model
 
-data_dir = [
-    "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
-]
+# data_dir = [
+#     "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+#     "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+#     "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
+#     "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+#     "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+#     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
+# ]
+
+data_dir = ["machine_learning/data/Ischemia_Dataset_DR_flatten/"]
+
 X, y = load_dataset(data_dir)
-X, y = exclude_classes(X, y, exclude_labels=[-1])
+
+print(X.shape)
+
 X_train, X_test, y_train, y_test = split_dataset(X, y)
 
 methods = [
@@ -31,7 +36,7 @@ methods = [
     ('Logistic Regression', multilabel_logistic_classifier),
 ]
 
-results = []
+results = {}
 
 for name, func in methods:
     print(f'\n训练 {name}...')
@@ -42,21 +47,13 @@ for name, func in methods:
         print(f'{name}: 训练时间 = {elapsed:.4f}s')
         # 评估模型并记录准确度
         print(f'{name} 测试结果:')
-        from sklearn.metrics import accuracy_score
-
         y_pred = clf.predict(X_test)
-        acc = accuracy_score(y_test, y_pred)
-        print('Accuracy:', acc)
-        results.append(
-            {'method': name, 'time': elapsed, 'accuracy': acc, 'error': None}
-        )
+        metrics = evaluate_model(clf, X_test, y_test)
+        results[name] = metrics
     except Exception as e:
         elapsed = time.time() - start_time
-        results.append(
-            {'method': name, 'time': elapsed, 'accuracy': None, 'error': str(e)}
-        )
         print(f'{name}: 错误: {e}')
 
 print('\n训练完成:')
-for r in results:
-    print(r)
+for name, metrics in results.items():
+    print(f"Method: {name}, Metrics: {metrics}")

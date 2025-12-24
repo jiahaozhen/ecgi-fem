@@ -4,7 +4,12 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.utils.data import random_split, DataLoader, Dataset
-from sklearn.metrics import classification_report, hamming_loss, f1_score
+from sklearn.metrics import (
+    classification_report,
+    hamming_loss,
+    f1_score,
+    accuracy_score,
+)
 
 
 import os
@@ -146,9 +151,23 @@ def evaluate_model(model, loader, threshold=0.5, device="cuda"):
 
     y_pred = torch.cat(all_preds).numpy()
     y_true = torch.cat(all_targets).numpy()
-    print("Hamming loss:", hamming_loss(y_true, y_pred))
-    print("Micro F1:", f1_score(y_true, y_pred, average="micro"))
-    print("Macro F1:", f1_score(y_true, y_pred, average="macro"))
-    print(classification_report(y_true, y_pred, digits=4, zero_division=0))
 
-    return f1_score(y_true, y_pred, average="macro")
+    h_loss = hamming_loss(y_true, y_pred)
+    f1_score_micro = f1_score(y_true, y_pred, average="micro")
+    f1_score_macro = f1_score(y_true, y_pred, average="macro")
+    a_score = accuracy_score(y_true, y_pred)
+
+    # 3️⃣ 评估
+    # print("Threshold:", threshold)
+    print("Hamming loss:", h_loss)
+    print("Micro F1:", f1_score_micro)
+    print("Macro F1:", f1_score_macro)
+    print("Accuracy Score:", a_score)
+    # print(classification_report(y_true, y_pred, digits=4))
+
+    return {
+        "Hamming loss": h_loss,
+        "Micro F1": f1_score_micro,
+        "Macro F1": f1_score_macro,
+        "accuracy score": a_score,
+    }

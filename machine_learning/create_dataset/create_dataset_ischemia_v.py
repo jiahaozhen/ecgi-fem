@@ -84,6 +84,18 @@ def generate_ischemia_data(
                         u_peak_ischemia_val_list, u_rest_ischemia_val_list
                     ):
                         try:
+                            label = get_ischemia_segment(
+                                subdomain_ventricle.geometry.x,
+                                segment_ids,
+                                epi_endo_marker,
+                                center_ischemia,
+                                radius_ischemia,
+                                ischemia_epi_endo,
+                            )
+                            is_all_zero = all(v == 0 for v in label)
+                            if is_all_zero:
+                                pbar.update(1)
+                                continue
                             v, _, _ = compute_v_based_on_reaction_diffusion(
                                 mesh_file,
                                 gdim=gdim,
@@ -97,15 +109,8 @@ def generate_ischemia_data(
                                 u_rest_ischemia_val=u_rest_ischemia_val,
                                 activation_dict_origin=activation_dict,
                             )
+
                             all_v_results.append(v)
-                            label = get_ischemia_segment(
-                                subdomain_ventricle.geometry.x,
-                                segment_ids,
-                                epi_endo_marker,
-                                center_ischemia,
-                                radius_ischemia,
-                                ischemia_epi_endo,
-                            )
                             all_seg_ids.append(label)
                             pbar.update(1)
 

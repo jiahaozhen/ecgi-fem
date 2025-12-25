@@ -1,4 +1,5 @@
 import time
+import os
 from machine_learning.dl_method.BiGRUClassifier import BiGRUClassifier
 from machine_learning.dl_method.BiLSTMClassifier import BiLSTMClassifier
 from machine_learning.dl_method.CNNBiLSTM import CNNBiLSTM
@@ -47,12 +48,26 @@ def test_all_classifiers():
 
     results = {}
 
+    path_root = "machine_learning/data/model/"
+    os.makedirs(path_root, exist_ok=True)
+
     for name, method in methods:
         print(f'\n训练 {name}...')
         start_time = time.time()
         try:
             model = method(input_dim)
-            model = train_model(model, train_loader, epochs=30, lr=1e-3)
+            save_path = os.path.join(path_root, f"{name}_last.pth")
+            load_path = save_path if os.path.exists(save_path) else None
+
+            model = train_model(
+                model,
+                train_loader,
+                epochs=30,
+                lr=1e-3,
+                load_path=load_path,
+                save_path=save_path,
+            )
+
             elapsed = time.time() - start_time
             print(f'{name}: 训练时间 = {elapsed:.4f}s')
             # 评估模型并记录准确度

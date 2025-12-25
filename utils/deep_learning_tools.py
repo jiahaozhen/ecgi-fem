@@ -102,27 +102,57 @@ def build_train_test_loaders(
     return train_loader, test_loader
 
 
-def train_model(model, loader, epochs=30, lr=1e-3, device="cuda"):
+def train_model(
+    model,
+    loader,
+    epochs=30,
+    lr=1e-3,
+    device="cuda",
+    save_path=None,
+    load_path=None,
+):
     model.to(device)
+
+    # --------------------
+    # Load model (optional)
+    # --------------------
+    if load_path is not None and os.path.exists(load_path):
+        model.load_state_dict(torch.load(load_path, map_location=device))
+        print(f"📥 Loaded model from {load_path}")
+        return model
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.BCEWithLogitsLoss()
 
-    model.train()
+    # --------------------
+    # Training
+    # --------------------
     for epoch in range(epochs):
+        model.train()
         total_loss = 0.0
+
         for X, y in loader:
             X = X.to(device)
-            y = y.to(device).float()  # (B, n_classes)
+            y = y.to(device).float()
 
             optimizer.zero_grad()
-            logits = model(X)  # (B, n_classes)
+            logits = model(X)
             loss = criterion(logits, y)
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item()
 
-        print(f"Epoch [{epoch+1}/{epochs}] Loss: {total_loss / len(loader):.4f}")
+        avg_loss = total_loss / len(loader)
+        print(f"Epoch [{epoch+1}/{epochs}] Loss: {avg_loss:.4f}")
+
+    # --------------------
+    # Save LAST model
+    # --------------------
+    if save_path is not None:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        torch.save(model.state_dict(), save_path)
+        print(f"💾 Saved last model to {save_path}")
 
     return model
 

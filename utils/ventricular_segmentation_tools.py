@@ -385,14 +385,14 @@ def get_ischemia_segment(
     label = np.zeros(n_seg, dtype=np.int64)
 
     if len(lv_pts_layer) == 0:
-        return label.tolist()
+        return label
 
     # ---------- 2. 空间缺血区域 ----------
     tree = cKDTree(lv_pts_layer)
     indices = tree.query_ball_point(center_ischemia, radius_ischemia)
 
     if len(indices) == 0:
-        return label.tolist()
+        return label
 
     seg_ids_in_region = seg_ids_layer[indices]
 
@@ -404,4 +404,4 @@ def get_ischemia_segment(
         if ischemia_pts / total_pts > ratio_threshold:
             label[int(seg)] = 1
 
-    return label.tolist()
+    return label

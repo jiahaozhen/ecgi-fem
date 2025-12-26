@@ -1,15 +1,3 @@
-"""
-创建心肌缺血数据集
-输入： 多时刻体表电压数据
-输出： 缺血位置分区数据
-
-变化维度：
-1. 缺血位置： N(心室节点数)
-2. 缺血半径： 2个半径(10, 20)
-3. 缺血范围： 3个范围(外膜, 内膜, 外中内)
-4. 严重程度： 2个程度(-80mV/0mV, -70mV/-10mV)
-"""
-
 import os
 import logging
 import h5py
@@ -57,7 +45,8 @@ def generate_ischemia_data(
     epi_endo_marker = distinguish_epi_endo(mesh_file, gdim=gdim)
 
     # 参数定义
-    ischemia_epi_endo_list = [[1, 0], [0, 1], [-1, 0, 1]]
+    ischemia_epi_endo_list = [[1, 0], [0, -1], [1, 0, -1]]
+    ischemia_epi_endo_rep = ['110', '011', '111']
     if severity == 'mild':
         radius_ischemia_list = [15]
         u_peak_ischemia_val_list = [0.9]
@@ -67,7 +56,8 @@ def generate_ischemia_data(
         u_peak_ischemia_val_list = [0.8]
         u_rest_ischemia_val_list = [0.2]
     all_v_results = []
-    all_seg_ids = []
+    all_metadata = []
+    all_labels = []
 
     total_loops = (
         len(center_ischemia_list)
@@ -79,7 +69,9 @@ def generate_ischemia_data(
     with tqdm(total=total_loops, desc="生成心肌缺血数据集", dynamic_ncols=True) as pbar:
         for center_ischemia in center_ischemia_list:
             for radius_ischemia in radius_ischemia_list:
-                for ischemia_epi_endo in ischemia_epi_endo_list:
+                for ischemia_epi_endo, rep_epi_endo in zip(
+                    ischemia_epi_endo_list, ischemia_epi_endo_rep
+                ):
                     for u_peak_ischemia_val, u_rest_ischemia_val in zip(
                         u_peak_ischemia_val_list, u_rest_ischemia_val_list
                     ):
@@ -109,34 +101,58 @@ def generate_ischemia_data(
                                 u_rest_ischemia_val=u_rest_ischemia_val,
                                 activation_dict_origin=activation_dict,
                             )
-
+                            metadata = {
+                                "center": center_ischemia,
+                                "radius": radius_ischemia,
+                                "peak": u_peak_ischemia_val,
+                                "rest": u_rest_ischemia_val,
+                                "epi_endo": rep_epi_endo,
+                            }
+                            all_metadata.append(metadata)
                             all_v_results.append(v)
-                            all_seg_ids.append(label)
+                            all_labels.append(label)
                             pbar.update(1)
 
                             if len(all_v_results) >= save_interval:
                                 save_partial_data(
-                                    all_v_results, all_seg_ids, save_dir, partial_idx
+                                    all_v_results,
+                                    all_labels,
+                                    all_metadata,
+                                    save_dir,
+                                    partial_idx,
                                 )
                                 partial_idx += 1
                                 all_v_results.clear()
-                                all_seg_ids.clear()
+                                all_labels.clear()
+                                all_metadata.clear()
                         except Exception as e:
                             logging.error(f"数据生成失败: {e}")
 
     if all_v_results:
-        save_partial_data(all_v_results, all_seg_ids, save_dir, partial_idx)
+        save_partial_data(
+            all_v_results, all_labels, all_metadata, save_dir, partial_idx
+        )
         logging.info("✅ 已保存最后文件")
 
 
 # Function to save partial data
-def save_partial_data(v_results, seg_ids, save_dir, partial_idx):
+def save_partial_data(v_results, labels, metadata_list, save_dir, partial_idx):
     X = np.array(v_results)
-    y = np.array(seg_ids)
+    y = np.array(labels)
+    center = np.array([m["center"] for m in metadata_list])
+    radius = np.array([m["radius"] for m in metadata_list])
+    peak = np.array([m["peak"] for m in metadata_list])
+    rest = np.array([m["rest"] for m in metadata_list])
+    epi_endo = [m["epi_endo"] for m in metadata_list]
     partial_file = os.path.join(save_dir, f"v_part_{partial_idx:03d}.h5")
     with h5py.File(partial_file, "w") as f:
         f.create_dataset("X", data=X, compression="gzip")
         f.create_dataset("y", data=y, compression="gzip")
+        f.create_dataset("center", data=center, compression="gzip")
+        f.create_dataset("radius", data=radius, compression="gzip")
+        f.create_dataset("peak", data=peak, compression="gzip")
+        f.create_dataset("rest", data=rest, compression="gzip")
+        f.create_dataset("epi_endo", data=epi_endo, compression="gzip")
     logging.info(f"✅ 已保存 {partial_file}")
 
 

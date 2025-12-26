@@ -43,7 +43,7 @@ def test_all_classifiers():
     )
 
     # 自动推断 input_dim（从 train_loader 第一个 batch）
-    X_sample, _ = next(iter(train_loader))
+    X_sample, _, _ = next(iter(train_loader))
     input_dim = X_sample.shape[-1]
 
     results = {}

@@ -1,8 +1,8 @@
 import os
 import h5py
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.optim import Adam
 from torch.utils.data import random_split, DataLoader, Dataset
 from sklearn.metrics import (
     classification_report,
@@ -70,18 +70,34 @@ class H5Dataset(Dataset):
         if self.transform:
             X = self.transform(X)
 
-        return X, y
+        meta = {
+            "file": fpath,
+            "file_idx": file_idx,
+            "sample_idx": sample_idx,
+            "global_idx": idx,
+        }
+
+        return X, y, meta
 
 
 def build_train_test_loaders(
-    data_dir, batch_size=32, test_ratio=0.2, num_workers=4, transform=None
+    data_dir,
+    batch_size=32,
+    test_ratio=0.2,
+    num_workers=4,
+    transform=None,
+    seed=42,
 ):
     full_dataset = H5Dataset(data_dir, transform=transform)
     total_len = len(full_dataset)
     test_len = int(total_len * test_ratio)
     train_len = total_len - test_len
 
-    train_set, test_set = random_split(full_dataset, [train_len, test_len])
+    # 固定随机种子
+    g = torch.Generator()
+    g.manual_seed(seed)
+
+    train_set, test_set = random_split(full_dataset, [train_len, test_len], generator=g)
 
     train_loader = DataLoader(
         train_set,
@@ -131,7 +147,7 @@ def train_model(
         model.train()
         total_loss = 0.0
 
-        for X, y in loader:
+        for X, y, _ in loader:
             X = X.to(device)
             y = y.to(device).float()
 
@@ -168,7 +184,7 @@ def evaluate_model(model, loader, threshold=0.5, device="cuda"):
     all_targets = []
 
     with torch.no_grad():
-        for X, y in loader:
+        for X, y, _ in loader:
             X = X.to(device)
             y = y.to(device)
 
@@ -201,3 +217,61 @@ def evaluate_model(model, loader, threshold=0.5, device="cuda"):
         "Macro F1": f1_score_macro,
         "accuracy score": a_score,
     }
+
+
+def find_wrong_samples(model, dataloader, device="cuda", threshold=0.5):
+    model.eval()
+
+    wrong_samples = []
+
+    with torch.no_grad():
+        for x, y, meta in dataloader:
+            x = x.to(device)
+            y = y.to(device)
+
+            logits = model(x)
+            probs = torch.sigmoid(logits)
+            y_pred = (probs > threshold).int()  # (B, 17)
+
+            # 任一标签预测错误即算错样本
+            wrong_mask = (y_pred != y).any(dim=1)  # (B,)
+            wrong_indices = torch.nonzero(wrong_mask, as_tuple=False).squeeze(1)
+
+            for i in wrong_indices:
+                wrong_samples.append(
+                    {
+                        "file": meta["file"][i],
+                        "sample_idx": meta["sample_idx"][i].item(),
+                        "x": x[i].detach().cpu(),
+                        "y_pred": y_pred[i].detach().cpu(),
+                        "y_true": y[i].detach().cpu(),
+                    }
+                )
+
+    return wrong_samples
+
+
+def save_wrong_samples(wrong_samples, save_path):
+
+    with h5py.File(save_path, "w") as f:
+
+        y_true = []
+        y_pred = []
+        sample_idx = []
+        file = []
+
+        for i, s in enumerate(wrong_samples):
+
+            # ---- 标签统一成 numpy ----
+            y_true.append(np.asarray(s["y_true"]))
+            y_pred.append(np.asarray(s["y_pred"]))
+            sample_idx.append(s.get("sample_idx", -1))
+            file.append(s.get("file", ""))
+
+        f.create_dataset("y_true", data=np.stack(y_true))
+        f.create_dataset("y_pred", data=np.stack(y_pred))
+        f.create_dataset("sample_idx", data=np.asarray(sample_idx))
+        dt = h5py.string_dtype(encoding="utf-8")
+        f.create_dataset("file", data=np.asarray(file, dtype=object), dtype=dt)
+
+    print(f"Saved {len(file)} samples to {save_path}")

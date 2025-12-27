@@ -26,16 +26,16 @@ methods = [
 
 
 def test_all_classifiers():
-    # data_dir = [
-    #     "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
-    # ]
+    data_dir = [
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
+    ]
 
-    data_dir = ["machine_learning/data/Ischemia_Dataset_DR_no_flatten/"]
+    # data_dir = ["machine_learning/data/Ischemia_Dataset_DR_no_flatten/"]
 
     # 🔥 使用你之前写好的随机划分函数
     train_loader, test_loader = build_train_test_loaders(

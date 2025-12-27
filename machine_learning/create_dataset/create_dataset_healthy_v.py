@@ -49,7 +49,7 @@ def generate_ischemia_data(
 
             all_v_results.append(v)
 
-            all_seg_ids.append(label.tolist())
+            all_seg_ids.append(label)
 
             # 定期保存数据以节省内存
             if (case_idx + 1) % save_interval == 0:

@@ -2,7 +2,6 @@ import torch
 from machine_learning.dl_method.BiGRUClassifier import BiGRUClassifier
 from utils.deep_learning_tools import (
     build_train_test_loaders,
-    train_model,
     find_wrong_samples,
     save_wrong_samples,
 )
@@ -34,14 +33,7 @@ if __name__ == '__main__':
         input_dim=input_dim,
     )
 
-    model = train_model(
-        model,
-        train_loader,
-        epochs=30,
-        lr=1e-3,
-        load_path=parameter_path,
-        save_path=parameter_path,
-    )
+    model.load_state_dict(torch.load(parameter_path, map_location=device))
 
     wrong_samples = find_wrong_samples(
         model,

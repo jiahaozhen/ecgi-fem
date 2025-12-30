@@ -23,8 +23,8 @@ def load_wrong_samples(h5_path):
         for i in range(n):
             samples.append(
                 {
-                    "y_true": y_true[i],  # numpy
-                    "y_pred": y_pred[i],  # numpy
+                    "y_true": y_true[i],
+                    "y_pred": y_pred[i],
                     "sample_idx": int(sample_idx[i]),
                     "file": file[i],
                 }
@@ -34,7 +34,10 @@ def load_wrong_samples(h5_path):
 
 
 if __name__ == '__main__':
-    samples = load_wrong_samples("machine_learning/data/wrong/wrong_samples.h5")
+
+    sample_path = "machine_learning/data/error_samples/ml/multilabel_xgb_classifier.h5"
+
+    samples = load_wrong_samples(sample_path)
 
     sample = samples[100]
 
@@ -56,9 +59,12 @@ if __name__ == '__main__':
         v_data = f["X"][sample_idx]
         center = f["center"][sample_idx]
         radius = f["radius"][sample_idx]
+        y = f["y"][sample_idx]
 
     y_true = sample["y_true"]
     y_pred = sample["y_pred"]
+
+    assert (y_true == y).all()
 
     if v_data.shape[1] == 1492:
         mesh_file = f'forward_inverse_3d/data/mesh/mesh_normal_male.msh'

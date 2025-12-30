@@ -8,6 +8,7 @@ from sklearn.metrics import (
     hamming_loss,
 )
 import h5py
+from joblib import dump, load
 
 
 def load_dataset(data_dir):
@@ -16,17 +17,67 @@ def load_dataset(data_dir):
 
     X_list, y_list = [], []
 
+    src_file_id_list = []
+    src_index_list = []
+    file_names = None
+
+    has_meta = True  # 只要有一个 h5 缺字段，就整体判定没有 meta
+
     for d in data_dir:
         assert os.path.isdir(d), f"{d} not found"
 
-        for f in sorted(os.listdir(d)):
-            if f.endswith(".h5"):
-                with h5py.File(os.path.join(d, f), "r") as data:
-                    X_list.append(data["X"][:])
-                    y_list.append(data["y"][:])
+        for fname in sorted(os.listdir(d)):
+            if not fname.endswith(".h5"):
+                continue
+
+            path = os.path.join(d, fname)
+
+            with h5py.File(path, "r") as f:
+                X_list.append(f["X"][:])
+                y_list.append(f["y"][:])
+
+                # ===== 检查 meta 是否存在 =====
+                if "src_file_id" in f and "src_index" in f and "file_names" in f:
+                    src_file_id_list.append(f["src_file_id"][:])
+                    src_index_list.append(f["src_index"][:])
+
+                    if file_names is None:
+                        file_names = [
+                            n.decode() if isinstance(n, bytes) else str(n)
+                            for n in f["file_names"][:]
+                        ]
+                else:
+                    has_meta = False
+
     X = np.vstack(X_list)
     y = np.concatenate(y_list)
-    return X, y
+
+    if not has_meta:
+        return X, y, None
+
+    meta = {
+        "src_file_id": np.concatenate(src_file_id_list),
+        "src_index": np.concatenate(src_index_list),
+        "file_names": file_names,
+    }
+
+    return X, y, meta
+
+
+def train_model(clf, X_train, y_train, save_path=None, load_path=None):
+    if load_path is not None and os.path.exists(load_path):
+        clf = load(load_path)
+        print(f"📥 Loaded model from {load_path}")
+        return clf
+
+    clf.fit(X_train, y_train)
+
+    if save_path is not None:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        dump(clf, save_path)
+        print(f"💾 Saved model to {save_path}")
+
+    return clf
 
 
 def flatten_data(data: np.ndarray):
@@ -36,9 +87,11 @@ def flatten_data(data: np.ndarray):
 
 
 def split_dataset(X, y, test_size=0.2, random_state=42):
+    idx = np.arange(len(X))
     return train_test_split(
         X,
         y,
+        idx,
         test_size=test_size,
         random_state=random_state,
         shuffle=True,

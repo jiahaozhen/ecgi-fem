@@ -59,40 +59,25 @@ def read_all_h5(h5_files, x_key="X", y_key="y"):
 def compress_from_multiple_dirs(
     input_dirs,
     output_h5,
+    reducer,
     x_key="X",
     y_key="y",
 ):
-    # ============================
-    # 1. Collect all h5
-    # ============================
     h5_files = collect_h5_from_dirs(input_dirs)
+
     print(f"Found {len(h5_files)} h5 files")
 
-    # ============================
-    # 2. Read all
-    # ============================
     X_all, y_all, src_file_ids, src_indices = read_all_h5(
         h5_files,
         x_key=x_key,
         y_key=y_key,
     )
 
-    # ============================
-    # 3. Build reducer
-    # ============================
-    reducer = ECGReducerFactory.create("flat_pca", out_dim=256)
-
-    # ============================
-    # 4. Fit + transform
-    # ============================
     print("Compressing ECG data...")
     X_reduced = reducer.fit_transform(X_all)
 
     print(f"Reduced X shape: {X_reduced.shape}")
 
-    # ============================
-    # 5. Save to one h5
-    # ============================
     with h5py.File(output_h5, "w") as f:
         f.create_dataset(
             x_key,
@@ -103,7 +88,6 @@ def compress_from_multiple_dirs(
 
         f.create_dataset(y_key, data=y_all)
 
-        # ===== 样本级来源信息（强烈推荐） =====
         f.create_dataset(
             "src_file_id",
             data=src_file_ids,
@@ -114,7 +98,6 @@ def compress_from_multiple_dirs(
             data=src_indices,
         )
 
-        # ===== 文件级信息 =====
         f.create_dataset(
             "file_names",
             data=np.array(
@@ -127,6 +110,25 @@ def compress_from_multiple_dirs(
 
 
 if __name__ == "__main__":
+
+    method_name_list = [
+        "flat",
+        "flat_pca",
+        "lead_pca",
+        "temporal_pca",
+        "temporal_pooling",
+        "temporal_downsample",
+        "temporal_lead_pca",
+    ]
+    method_name = method_name_list[-1]
+    reducer = ECGReducerFactory.create(method_name)
+
+    out_put_h5_dir = f"machine_learning/data/Ischemia_Dataset_{method_name}/"
+
+    os.makedirs(out_put_h5_dir, exist_ok=True)
+
+    out_put_h5 = os.path.join(out_put_h5_dir, "data.h5")
+
     compress_from_multiple_dirs(
         input_dirs=[
             "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
@@ -136,7 +138,8 @@ if __name__ == "__main__":
             "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
             "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
         ],
-        output_h5="machine_learning/data/Ischemia_Dataset_DR_flatten/data.h5",
+        output_h5=out_put_h5,
+        reducer=reducer,
         x_key="X",
         y_key="y",
     )

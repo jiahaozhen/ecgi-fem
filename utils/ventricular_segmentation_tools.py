@@ -371,7 +371,7 @@ def get_ischemia_segment(
     center_ischemia,
     radius_ischemia,
     epi_endo_ischemia,
-    ratio_threshold=0.2,
+    ratio_threshold=0.1,
 ):
     allowed_layers = np.asarray(epi_endo_ischemia)
     layer_mask = np.isin(epi_endo_marker, allowed_layers)

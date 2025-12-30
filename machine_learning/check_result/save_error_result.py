@@ -49,6 +49,6 @@ if __name__ == '__main__':
         device=device,
     )
 
-    wrong_save_path = "machine_learning/data/wrong/wrong_samples.h5"
+    wrong_save_path = "machine_learning/data/wrong/dl_wrong_samples.h5"
 
     save_wrong_samples(wrong_samples, wrong_save_path)

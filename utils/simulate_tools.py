@@ -380,7 +380,7 @@ def compute_full_activation_dict(activation_dict, pts, threshold, add_noise, pow
     if add_noise:
         from .signal_processing_tools import add_noise_based_on_snr
 
-        known_times = add_noise_based_on_snr(known_times, snr=30)
+        known_times = add_noise_based_on_snr(known_times, snr=10)
 
     # ---- 保证 pts 形状正确 ----
     pts = np.asarray(pts, dtype=float)

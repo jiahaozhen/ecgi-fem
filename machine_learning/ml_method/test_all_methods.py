@@ -8,7 +8,12 @@ from machine_learning.ml_method.logistic_regression import (
     multilabel_logistic_classifier,
 )
 
-from utils.machine_learning_tools import load_dataset, split_dataset, evaluate_model
+from utils.machine_learning_tools import (
+    load_dataset,
+    split_dataset,
+    train_model,
+    evaluate_model,
+)
 
 # data_dir = [
 #     "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
@@ -21,11 +26,11 @@ from utils.machine_learning_tools import load_dataset, split_dataset, evaluate_m
 
 data_dir = ["machine_learning/data/Ischemia_Dataset_DR_flatten/"]
 
-X, y = load_dataset(data_dir)
+X, y, _ = load_dataset(data_dir)
 
 print(X.shape)
 
-X_train, X_test, y_train, y_test = split_dataset(X, y)
+X_train, X_test, y_train, y_test, _, _ = split_dataset(X, y)
 
 methods = [
     ('KNN', multilabel_knn_ovr_classifier),
@@ -40,14 +45,17 @@ results = {}
 
 for name, func in methods:
     print(f'\n训练 {name}...')
+    model_path = f"machine_learning/data/model/ml_model/{func.__name__}.joblib"
     start_time = time.time()
     try:
-        clf = func(X_train, y_train)
+        clf = func()
+        clf = train_model(
+            clf, X_train, y_train, save_path=model_path, load_path=model_path
+        )
         elapsed = time.time() - start_time
         print(f'{name}: 训练时间 = {elapsed:.4f}s')
         # 评估模型并记录准确度
         print(f'{name} 测试结果:')
-        y_pred = clf.predict(X_test)
         metrics = evaluate_model(clf, X_test, y_test)
         results[name] = metrics
     except Exception as e:

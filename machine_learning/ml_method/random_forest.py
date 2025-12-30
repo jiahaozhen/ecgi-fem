@@ -4,11 +4,13 @@ from sklearn.multiclass import OneVsRestClassifier
 from utils.machine_learning_tools import (
     load_dataset,
     split_dataset,
+    train_model,
     evaluate_model,
 )
 
 
-def multilabel_rf_classifier(X_train, y_train):
+def multilabel_rf_classifier():
+
     base_clf = RandomForestClassifier(
         n_estimators=500,
         max_depth=None,
@@ -16,8 +18,9 @@ def multilabel_rf_classifier(X_train, y_train):
         n_jobs=-1,
         random_state=42,
     )
+
     clf = OneVsRestClassifier(base_clf)
-    clf.fit(X_train, y_train)
+
     return clf
 
 
@@ -31,10 +34,14 @@ if __name__ == "__main__":
         "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
     ]
 
-    X, y = load_dataset(data_dir)
+    model_path = f"machine_learning/data/model/ml_model/{multilabel_rf_classifier.__name__}.joblib"
 
-    X_train, X_test, y_train, y_test = split_dataset(X, y)
+    X, y, _ = load_dataset(data_dir)
 
-    clf = multilabel_rf_classifier(X_train, y_train)
+    X_train, X_test, y_train, y_test, _, _ = split_dataset(X, y)
+
+    clf = multilabel_rf_classifier()
+
+    clf = train_model(clf, X_train, y_train, save_path=model_path, load_path=model_path)
 
     evaluate_model(clf, X_test, y_test)

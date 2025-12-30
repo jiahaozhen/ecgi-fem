@@ -38,7 +38,7 @@ if __name__ == "__main__":
     #     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
     # ]
 
-    data_dir = ["machine_learning/data/Ischemia_Dataset_DR_flatten/"]
+    data_dir = ["machine_learning/data/Ischemia_Dataset_flat_pca/"]
 
     model_path = f"machine_learning/data/model/ml_model/{multilabel_xgb_classifier.__name__}.joblib"
 

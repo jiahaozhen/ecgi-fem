@@ -24,7 +24,7 @@ from utils.machine_learning_tools import (
 #     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
 # ]
 
-data_dir = ["machine_learning/data/Ischemia_Dataset_DR_flatten/"]
+data_dir = ["machine_learning/data/Ischemia_Dataset_flat_pca/"]
 
 X, y, _ = load_dataset(data_dir)
 

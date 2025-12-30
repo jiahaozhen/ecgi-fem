@@ -25,14 +25,16 @@ def multilabel_rf_classifier():
 
 
 if __name__ == "__main__":
-    data_dir = [
-        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
-    ]
+    # data_dir = [
+    #     "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+    #     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
+    # ]
+
+    data_dir = ["machine_learning/data/Ischemia_Dataset_flat_pca/"]
 
     model_path = f"machine_learning/data/model/ml_model/{multilabel_rf_classifier.__name__}.joblib"
 

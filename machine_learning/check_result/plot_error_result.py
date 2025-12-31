@@ -35,7 +35,7 @@ def load_wrong_samples(h5_path):
 
 if __name__ == '__main__':
 
-    sample_path = "machine_learning/data/error_samples/ml/multilabel_xgb_classifier.h5"
+    sample_path = "machine_learning/data/error_samples/dl/TransformerClassifier.h5"
 
     samples = load_wrong_samples(sample_path)
 

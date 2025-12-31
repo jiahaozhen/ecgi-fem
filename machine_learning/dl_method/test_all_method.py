@@ -35,8 +35,6 @@ def test_all_classifiers():
         "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
     ]
 
-    # data_dir = ["machine_learning/data/Ischemia_Dataset_DR_no_flatten/"]
-
     # 🔥 使用你之前写好的随机划分函数
     train_loader, test_loader = build_train_test_loaders(
         data_dir=data_dir, batch_size=32, test_ratio=0.2, num_workers=4
@@ -48,7 +46,7 @@ def test_all_classifiers():
 
     results = {}
 
-    path_root = "machine_learning/data/model/"
+    path_root = "machine_learning/data/model/dl_model"
     os.makedirs(path_root, exist_ok=True)
 
     for name, method in methods:
@@ -56,7 +54,7 @@ def test_all_classifiers():
         start_time = time.time()
         try:
             model = method(input_dim)
-            save_path = os.path.join(path_root, f"{name}_last.pth")
+            save_path = os.path.join(path_root, f"{method.__name__}.pth")
             load_path = save_path if os.path.exists(save_path) else None
 
             model = train_model(

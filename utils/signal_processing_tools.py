@@ -458,3 +458,86 @@ def batch_extract_features(data_batch, fs=1000):
                 print(f"Shape mismatch for record {i}: {feats.shape} vs {(D, F)}")
 
     return features_array, feature_names
+
+
+# 写一个新的batch_extract_features，提取一些所有导联的统计信息（这些信息依旧是之前函数里提到的，包括ST段信息和T波信息）
+def batch_extract_statistical_features(data_batch, fs=1000):
+    """
+    Batch process ECG data to extract statistical features across all leads.
+
+    Parameters:
+    - data_batch: (B, T, D) numpy array.
+        B: Batch size (number of records)
+        T: Time steps (number of samples)
+        D: Dimensions (number of leads)
+    - fs: sampling frequency in Hz.
+
+    Returns:
+    - features_array: (B, F) numpy array.
+    - feature_names: list of feature names.
+    """
+    if data_batch.ndim != 3:
+        raise ValueError("data_batch must be 3D: (B, T, D)")
+
+    B, T, D = data_batch.shape
+
+    features_list = []
+    feature_names = [
+        'ST_level_60_mean',
+        'ST_level_60_std',
+        'ST_level_80_mean',
+        'ST_level_80_std',
+        'ST_slope_mean',
+        'ST_slope_std',
+        'ST_area_mean',
+        'ST_area_std',
+        'ST_min_mean',
+        'ST_min_std',
+        'ST_mean_mean',
+        'ST_mean_std',
+        'T_peak_amplitude_mean',
+        'T_peak_amplitude_std',
+        'T_width_mean',
+        'T_width_std',
+        'T_area_mean',
+        'T_area_std',
+    ]
+
+    print(f"Starting batch processing for {B} records...")
+
+    for i in range(B):
+        record_data = data_batch[i]
+
+        try:
+            df = extract_features(record_data, fs=fs)
+
+            # Calculate statistical features across all leads
+            record_features = [
+                df['ST_level_60'].mean(),
+                df['ST_level_60'].std(),
+                df['ST_level_80'].mean(),
+                df['ST_level_80'].std(),
+                df['ST_slope'].mean(),
+                df['ST_slope'].std(),
+                df['ST_area'].mean(),
+                df['ST_area'].std(),
+                df['ST_min'].mean(),
+                df['ST_min'].std(),
+                df['ST_mean'].mean(),
+                df['ST_mean'].std(),
+                df['T_peak_amplitude'].mean(),
+                df['T_peak_amplitude'].std(),
+                df['T_width'].mean(),
+                df['T_width'].std(),
+                df['T_area'].mean(),
+                df['T_area'].std(),
+            ]
+
+            features_list.append(record_features)
+
+        except Exception as e:
+            print(f"Error processing record {i}: {e}")
+            features_list.append([np.nan] * len(feature_names))
+
+    features_array = np.array(features_list)
+    return features_array, feature_names

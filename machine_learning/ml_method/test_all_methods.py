@@ -15,6 +15,17 @@ from utils.machine_learning_tools import (
     evaluate_model,
 )
 
+data_dir = [
+    "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_features_dataset/",
+    "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_features_dataset/",
+    "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_features_dataset/",
+    "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_features_dataset/",
+    "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_features_dataset/",
+    "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_features_dataset/",
+]
+
+# data_dir = ["machine_learning/data/Ischemia_Dataset_flat_pca/"]
+
 # data_dir = [
 #     "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
 #     "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
@@ -24,9 +35,10 @@ from utils.machine_learning_tools import (
 #     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
 # ]
 
-data_dir = ["machine_learning/data/Ischemia_Dataset_flat_pca/"]
-
 X, y, _ = load_dataset(data_dir)
+
+if X.ndim == 3:
+    X = X.reshape(X.shape[0], -1)
 
 print(X.shape)
 
@@ -36,7 +48,7 @@ methods = [
     ('KNN', multilabel_knn_ovr_classifier),
     ('LightGBM', multilabel_lgb_classifier),
     ('XGB', multilabel_xgb_classifier),
-    ('SVM', multilabel_svm_classifier),
+    # ('SVM', multilabel_svm_classifier),
     ('Random Forest', multilabel_rf_classifier),
     ('Logistic Regression', multilabel_logistic_classifier),
 ]
@@ -45,7 +57,7 @@ results = {}
 
 for name, func in methods:
     print(f'\n训练 {name}...')
-    model_path = f"machine_learning/data/model/ml_model/{func.__name__}.joblib"
+    model_path = f"machine_learning/data/model/features/ml_model/{func.__name__}.joblib"
     start_time = time.time()
     try:
         clf = func()

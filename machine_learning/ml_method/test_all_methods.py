@@ -15,25 +15,51 @@ from utils.machine_learning_tools import (
     evaluate_model,
 )
 
-data_dir = [
-    "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_features_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_features_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_features_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_features_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_features_dataset/",
-    "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_features_dataset/",
-]
 
-# data_dir = ["machine_learning/data/Ischemia_Dataset_flat_pca/"]
+dataset_type = "statistical_features"
+# dataset_type = "features"
+# dataset_type = "processed"
+# dataset_type = "pca"
 
-# data_dir = [
-#     "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
-#     "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
-#     "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
-#     "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
-#     "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
-#     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
-# ]
+if dataset_type == "statistical_features":
+    data_dir = [
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_statistical_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_statistical_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_statistical_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_statistical_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_statistical_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_statistical_features_dataset/",
+    ]
+    model_save_dir = "machine_learning/data/model/statistical_features/ml_model"
+
+elif dataset_type == "features":
+    data_dir = [
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_features_dataset/",
+    ]
+    model_save_dir = "machine_learning/data/model/features/ml_model"
+
+elif dataset_type == "processed":
+    data_dir = [
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
+    ]
+    model_save_dir = "machine_learning/data/model/processed/ml_model"
+
+elif dataset_type == "pca":
+    data_dir = ["machine_learning/data/Ischemia_Dataset_flat_pca/"]
+    model_save_dir = "machine_learning/data/model/pca/ml_model"
+
+else:
+    raise ValueError(f"Unknown dataset_type: {dataset_type}")
 
 X, y, _ = load_dataset(data_dir)
 
@@ -48,7 +74,7 @@ methods = [
     ('KNN', multilabel_knn_ovr_classifier),
     ('LightGBM', multilabel_lgb_classifier),
     ('XGB', multilabel_xgb_classifier),
-    # ('SVM', multilabel_svm_classifier),
+    ('SVM', multilabel_svm_classifier),
     ('Random Forest', multilabel_rf_classifier),
     ('Logistic Regression', multilabel_logistic_classifier),
 ]
@@ -57,7 +83,7 @@ results = {}
 
 for name, func in methods:
     print(f'\n训练 {name}...')
-    model_path = f"machine_learning/data/model/features/ml_model/{func.__name__}.joblib"
+    model_path = f"{model_save_dir}/{func.__name__}.joblib"
     start_time = time.time()
     try:
         clf = func()

@@ -26,23 +26,33 @@ methods = [
 
 
 def test_all_classifiers():
-    # data_dir = [
-    #     "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
-    #     "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
-    # ]
+    # dataset_type = "features"
+    dataset_type = "processed"
 
-    data_dir = [
-        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_features_dataset/",
-    ]
+    if dataset_type == "features":
+        data_dir = [
+            "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_features_dataset/",
+        ]
+        model_save_dir = "machine_learning/data/model/features/dl_model"
+
+    elif dataset_type == "processed":
+        data_dir = [
+            "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
+        ]
+        model_save_dir = "machine_learning/data/model/processed/dl_model"
+
+    else:
+        raise ValueError(f"Unknown dataset_type: {dataset_type}")
 
     # 🔥 使用你之前写好的随机划分函数
     train_loader, test_loader = build_train_test_loaders(
@@ -55,15 +65,14 @@ def test_all_classifiers():
 
     results = {}
 
-    path_root = "machine_learning/data/model/features/dl_model"
-    os.makedirs(path_root, exist_ok=True)
+    os.makedirs(model_save_dir, exist_ok=True)
 
     for name, method in methods:
         print(f'\n训练 {name}...')
         start_time = time.time()
         try:
             model = method(input_dim)
-            save_path = os.path.join(path_root, f"{method.__name__}.pth")
+            save_path = os.path.join(model_save_dir, f"{method.__name__}.pth")
             load_path = save_path if os.path.exists(save_path) else None
 
             model = train_model(

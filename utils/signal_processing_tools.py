@@ -248,145 +248,144 @@ def _extract_single_lead_features(signal, fs=1000):
     :param fs: 采样率 (Hz)
     :return: 包含特征的字典
     """
-    features = {}
+    # Initialize all simple features with 0.0 to avoid NaNs
+    st_level_60 = 0.0
+    st_level_80 = 0.0
+    st_slope = 0.0
+    st_area = 0.0
+    st_min = 0.0
+    st_mean = 0.0
+    t_amp = 0.0
+    t_latency = 0.0
+    t_width = 0.0
+    t_area = 0.0
+    t_sign = 0.0
+
     n = len(signal)
+    if n == 0:
+        return {
+            "ST_level_60": st_level_60,
+            "ST_level_80": st_level_80,
+            "ST_slope": st_slope,
+            "ST_area": st_area,
+            "ST_min": st_min,
+            "ST_mean": st_mean,
+            "T_peak_amplitude": t_amp,
+            "T_peak_latency": t_latency,
+            "T_width": t_width,
+            "T_area": t_area,
+            "T_sign": t_sign,
+        }
+
+    # Ensure no NaNs in signal
+    signal = np.nan_to_num(signal)
+    dt = 1000.0 / fs  # ms per sample
 
     # --- 1. 定位 R 波 (片段内的绝对最大值) ---
     r_idx = np.argmax(np.abs(signal))
-    features['R_amplitude'] = signal[r_idx]
-    # Return time instead of index
-    features['R_time'] = r_idx / fs * 1000  # ms
+    r_amp = signal[r_idx]
 
-    # 判断 R 波的主方向 (正向或负向)
-    # 如果 R 波为正，则 Q/S 为波谷 (min)；如果 R 波为负，则 Q/S 为波峰 (max)
-    if features['R_amplitude'] >= 0:
+    # --- 2. 定位 S 波 ---
+    # 如果 R 波为正，则 S 为 R 波后的局部最小值
+    # 如果 R 波为负，则 S 为 R 波后的局部最大值
+    if r_amp >= 0:
         find_extremum = np.argmin
     else:
         find_extremum = np.argmax
 
-    # --- 2. 定位 Q 波与 S 波 ---
-    # 搜索 R 前 50ms 寻找 Q
-    q_window = signal[max(0, r_idx - int(0.05 * fs)) : r_idx]
-    if len(q_window) > 0:
-        q_local_idx = find_extremum(q_window)
-        q_idx = r_idx - len(q_window) + q_local_idx
-        features['Q_amplitude'] = signal[q_idx]
-        features['Q_time'] = q_idx / fs * 1000  # ms
+    s_idx = r_idx  # Fallback
+    # Search S within 50ms after R
+    s_end_search = min(n, r_idx + int(0.05 * fs))
+    if s_end_search > r_idx:
+        s_window = signal[r_idx:s_end_search]
+        if len(s_window) > 0:
+            s_local_idx = find_extremum(s_window)
+            s_idx = r_idx + s_local_idx
 
-    # 搜索 R 后 50ms 寻找 S
-    s_window = signal[r_idx : min(n, r_idx + int(0.05 * fs))]
-    if len(s_window) > 0:
-        s_local_idx = find_extremum(s_window)
-        s_idx = r_idx + s_local_idx
-        features['S_amplitude'] = signal[s_idx]
-        features['S_time'] = s_idx / fs * 1000  # ms
-
-    # --- 3. 定位 T 波 (R波之后 100ms 到 450ms 之间的最大值) ---
-    # T 波可能与 R 波同向或反向，这里使用绝对值最大来定位
-    dt = 1000.0 / fs  # ms per sample (for feature calculation)
+    # --- 3. 定位 T 波 (R波之后 200ms 到 450ms 之间的最大值) ---
     t_start = r_idx + int(0.2 * fs)
     t_end = min(n, r_idx + int(0.45 * fs))
-
-    t_idx = t_amp = t_latency = t_width = t_area = t_sign = np.nan
+    t_idx = -1  # Invalid index
 
     if t_start < n:
-        t_window = signal[t_start:t_end]
-        if len(t_window) > 0:
-            t_local_idx = np.argmax(np.abs(t_window))
-            t_idx = t_start + t_local_idx
+        if t_end > t_start:
+            t_window = signal[t_start:t_end]
+            if len(t_window) > 0:
+                t_local_idx = np.argmax(np.abs(t_window))
+                t_idx = t_start + t_local_idx
 
-            t_amp = signal[t_idx]
-            t_latency = t_idx * dt
-            t_sign = np.sign(t_amp)
+                t_amp = signal[t_idx]
+                t_latency = t_idx * dt
+                t_sign = np.sign(t_amp)
 
-            features['T_amplitude'] = t_amp
-            features['T_time'] = t_idx / fs * 1000  # ms
-            features['T_peak_time'] = t_idx / fs * 1000  # ms
+                # Calculate T Width and Area
+                thresh = 0.1 * abs(t_amp)
 
-            # T wave boundaries (10% peak threshold)
-            thresh = 0.1 * abs(t_amp)
+                # Left boundary
+                # Scan backwards from peak within window
+                # t_window corresponds to signal[t_start:t_end]
+                # peak is at t_local_idx in t_window
 
-            # Search within the T window
-            # Convert local index to window-relative index
-            local_peak = t_local_idx
+                # left side:
+                left_search = t_window[:t_local_idx]
+                left_indices = np.where(np.abs(left_search) <= thresh)[0]
+                if len(left_indices) > 0:
+                    left_local = left_indices[-1] + 1
+                else:
+                    left_local = 0
 
-            # Find left boundary
-            left_mask = np.abs(t_window[:local_peak]) <= thresh
-            # Find the last index (closest to peak) that is below threshold
-            left_indices = np.where(left_mask)[0]
-            if len(left_indices) > 0:
-                left = (
-                    left_indices[-1] + 1
-                )  # Use the point just after it goes above threshold
-            else:
-                left = 0  # No point below threshold found to the left
+                # right side:
+                right_search = t_window[t_local_idx + 1 :]
+                right_indices = np.where(np.abs(right_search) <= thresh)[0]
+                if len(right_indices) > 0:
+                    right_local = t_local_idx + 1 + right_indices[0] - 1
+                else:
+                    right_local = len(t_window) - 1
 
-            # Find right boundary
-            right_mask = np.abs(t_window[local_peak + 1 :]) <= thresh
-            right_indices = np.where(right_mask)[0]
-            if len(right_indices) > 0:
-                right = (
-                    local_peak + 1 + right_indices[0] - 1
-                )  # Use point just before it drops
-            else:
-                right = len(t_window) - 1
+                t_width = (right_local - left_local + 1) * dt
+                t_area = np.sum(t_window[left_local : right_local + 1]) * dt
 
-            t_width = (right - left + 1) * dt
-            t_area = np.sum(t_window[left : right + 1]) * dt
+    # --- 4. ST Segment Information ---
+    # J point assumed 40ms after S
+    j_idx = s_idx + int(0.04 * fs)
 
-    features["T_peak_time"] = t_idx / fs * 1000 if not np.isnan(t_idx) else np.nan  # ms
-    features["T_peak_amplitude"] = t_amp
-    features["T_peak_latency"] = t_latency
-    features["T_width"] = t_width
-    features["T_area"] = t_area
-    features["T_sign"] = t_sign
+    # Helper for safe window mean
+    def safe_window_mean(center_idx, half_win=int(0.005 * fs)):
+        if center_idx >= n:
+            return 0.0
+        a = max(0, center_idx - half_win)
+        b = min(n, center_idx + half_win + 1)
+        if b > a:
+            return np.mean(signal[a:b])
+        return 0.0
 
-    # --- 4. Extract ST Segment Information ---
-    st_level_60 = st_level_80 = st_slope = st_area = st_min = st_mean = np.nan
+    if j_idx < n:
+        # ST level 60ms and 80ms after J
+        st_level_60 = safe_window_mean(j_idx + int(0.06 * fs))
+        st_level_80 = safe_window_mean(j_idx + int(0.08 * fs))
 
-    if 'S_time' in features:
-        # Backward compatibility for calculation logic requiring indices
-        # We can reconstruct index from time (ms): idx = int(time * fs / 1000)
-        s_idx = int(features['S_time'] * fs / 1000)
-        j_idx = s_idx + int(0.04 * fs)  # J point assumed 40ms after S
-        features['J_time'] = j_idx * dt
+        # ST Slope/Area/Min/Mean
+        st_seg_end = min(n, j_idx + int(0.08 * fs))
 
-        def mean_at_ms(start_idx, ms, window_ms=10):
-            center = start_idx + int(ms * fs / 1000)
-            half = int(window_ms * fs / 1000 / 2)
-            a = max(0, center - half)
-            b = min(n, center + half + 1)
-            return np.mean(signal[a:b]) if a < b else np.nan
+        # Don't overlap with T peak if T exists and is close
+        if t_idx != -1 and t_idx > j_idx:
+            st_seg_end = min(st_seg_end, t_idx)
 
-        st_level_60 = mean_at_ms(j_idx, 60)
-        st_level_80 = mean_at_ms(j_idx, 80)
-
-        st_start = j_idx
-        st_end = min(n, j_idx + int(0.08 * fs))  # 80ms window
-
-        # Avoid T wave overlap
-        if not np.isnan(t_idx):
-            st_end = min(st_end, int(t_idx))
-
-        if st_end > st_start:
-            st_seg = signal[st_start:st_end]
+        if st_seg_end > j_idx:
+            st_seg = signal[j_idx:st_seg_end]
             if len(st_seg) > 1:
                 t_seg_ms = np.arange(len(st_seg)) * dt
                 try:
-                    st_slope = np.polyfit(t_seg_ms, st_seg, 1)[0]
-                except np.linalg.LinAlgError:
-                    st_slope = 0
+                    slope, _ = np.polyfit(t_seg_ms, st_seg, 1)
+                    st_slope = slope
+                except:
+                    st_slope = 0.0
+
                 st_area = np.sum(st_seg) * dt
                 st_min = np.min(st_seg)
                 st_mean = np.mean(st_seg)
 
-    features["ST_level_60"] = st_level_60
-    features["ST_level_80"] = st_level_80
-    features["ST_slope"] = st_slope
-    features["ST_area"] = st_area
-    features["ST_min"] = st_min
-    # Filter features to return only ST and T wave features
-    final_features = {
+    return {
         "ST_level_60": st_level_60,
         "ST_level_80": st_level_80,
         "ST_slope": st_slope,
@@ -399,8 +398,6 @@ def _extract_single_lead_features(signal, fs=1000):
         "T_area": t_area,
         "T_sign": t_sign,
     }
-
-    return final_features
 
 
 def extract_features(data, fs=1000):
@@ -564,3 +561,34 @@ def batch_extract_statistical_features(data_batch, fs=1000):
                 print(f"Shape mismatch for record {i}")
 
     return features_array, feature_names
+
+
+def get_feature_names():
+    """
+    Return the list of base feature names extracted from ECG signals.
+    """
+    return [
+        "ST_level_60",
+        "ST_level_80",
+        "ST_slope",
+        "ST_area",
+        "ST_min",
+        "ST_mean",
+        "T_peak_amplitude",
+        "T_peak_latency",
+        "T_width",
+        "T_area",
+        "T_sign",
+    ]
+
+
+def get_statistical_feature_names():
+    """
+    Return the list of statistical feature names (mean and std for each base feature).
+    """
+    base_features = get_feature_names()
+    stats_features = []
+    for feat in base_features:
+        stats_features.append(f"{feat}_mean")
+        stats_features.append(f"{feat}_std")
+    return stats_features

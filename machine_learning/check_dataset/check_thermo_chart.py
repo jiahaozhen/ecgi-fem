@@ -1,14 +1,9 @@
-# 查看模型的训练结果热力图
-
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from utils.machine_learning_tools import (
     load_dataset,
-    split_dataset,
-    train_model,
 )
-from machine_learning.ml_method.xgb_method import multilabel_xgb_classifier
 from utils.signal_processing_tools import (
     get_feature_names,
     get_statistical_feature_names,
@@ -30,7 +25,6 @@ if dataset_type == "statistical_features":
         f"machine_learning/data/Ischemia_Dataset/normal_male2/severe/d{lead_config}_statistical_features_dataset/",
         f"machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d{lead_config}_statistical_features_dataset/",
     ]
-    model_save_dir = "machine_learning/data/model/statistical_features/ml_model"
     feature_names = get_statistical_feature_names()
 
 elif dataset_type == "features":
@@ -42,7 +36,6 @@ elif dataset_type == "features":
         f"machine_learning/data/Ischemia_Dataset/normal_male2/severe/d{lead_config}_features_dataset/",
         f"machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d{lead_config}_features_dataset/",
     ]
-    model_save_dir = "machine_learning/data/model/features/ml_model"
     base_names = get_feature_names()
     # Prefix each feature name with the lead number
     feature_names = [
@@ -59,7 +52,6 @@ elif dataset_type == "combined_features":
         f"machine_learning/data/Ischemia_Dataset/normal_male2/severe/d{lead_config}_combined_features_dataset/",
         f"machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d{lead_config}_combined_features_dataset/",
     ]
-    model_save_dir = "machine_learning/data/model/combined_features/ml_model"
     base_names = get_feature_names()
     # Prefix each feature name with the lead number
     feature_names_1 = [
@@ -125,21 +117,20 @@ def get_correlation_data(X, y, feature_names=None, label_names=None, top_n=20):
     return ranked_corr_values, ranked_feature_labels, label_names
 
 
-def plot_comparison(data_gt, data_pred, top_n):
+def plot_comparison(data_gt, top_n):
     vals_gt, labels_gt, col_names = data_gt
-    vals_pred, labels_pred, _ = data_pred
 
     n_labels = len(col_names)
 
-    # Create a figure with two subplots
-    _, axes = plt.subplots(2, 1, figsize=(max(8, n_labels * 0.8), max(6, top_n * 1.0)))
+    # Create a figure with one subplot
+    _, axes = plt.subplots(1, 1, figsize=(max(8, n_labels * 0.8), max(6, top_n * 1.0)))
 
     # Plot Ground Truth
     sns.heatmap(
         vals_gt,
         cmap="coolwarm",
         center=0,
-        ax=axes[0],
+        ax=axes,
         xticklabels=col_names,
         yticklabels=[f"Rank {i+1}" for i in range(top_n)],
         cbar_kws={'label': 'Pearson Correlation'},
@@ -149,66 +140,21 @@ def plot_comparison(data_gt, data_pred, top_n):
         fmt="",
         annot_kws={"size": 6},
     )
-    axes[0].set_title(f"[Ground Truth] Top {top_n} Correlated Features per Label")
-    axes[0].set_ylabel("Correlation Rank")
-
-    # Plot Model Predictions
-    sns.heatmap(
-        vals_pred,
-        cmap="coolwarm",
-        center=0,
-        ax=axes[1],
-        xticklabels=col_names,
-        yticklabels=[f"Rank {i+1}" for i in range(top_n)],
-        cbar_kws={'label': 'Pearson Correlation'},
-        vmin=-1,
-        vmax=1,
-        annot=labels_pred,
-        fmt="",
-        annot_kws={"size": 6},
-    )
-    axes[1].set_title(f"[Model Predictions] Top {top_n} Correlated Features per Label")
-    axes[1].set_xlabel("Results (Labels)")
-    axes[1].set_ylabel("Correlation Rank")
-
+    axes.set_title(f"[Ground Truth] Top {top_n} Correlated Features per Label")
+    axes.set_ylabel("Correlation Rank")
     plt.tight_layout()
     plt.show()
 
 
-# feature_names is already set based on dataset_type
-
-# Split Dataset
-print("Splitting Dataset...")
-X_train, X_test, y_train, y_test, _, _ = split_dataset(X, y)
-
 # 1. Ground Truth (Original Labels on Test Set)
 print("Calculating correlations for Ground Truth...")
 data_gt = get_correlation_data(
-    X_test,
-    y_test,
+    X,
+    y,
     feature_names=feature_names,
     top_n=5,
 )
 
-# 2. Training Results (Predicted Labels on Test Set)
-print("Training Model (XGBoost)...")
-# Using XGBoost as default
-clf = train_model(
-    multilabel_xgb_classifier(),
-    X_train,
-    y_train,
-    load_path=f"{model_save_dir}/multilabel_xgb_classifier.joblib",
-)
-print("Predicting on Test Set...")
-y_pred = clf.predict(X_test)
-
-print("Calculating correlations for Training Results...")
-data_pred = get_correlation_data(
-    X_test,
-    y_pred,
-    feature_names=feature_names,
-    top_n=5,
-)
 
 print("Plotting comparison...")
-plot_comparison(data_gt, data_pred, top_n=5)
+plot_comparison(data_gt, top_n=5)

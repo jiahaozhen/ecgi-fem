@@ -12,7 +12,7 @@ from utils.machine_learning_tools import (
 def multilabel_logistic_classifier():
 
     base_clf = LogisticRegression(
-        max_iter=2000,
+        max_iter=5000,
         class_weight="balanced",  # 处理标签不平衡
         n_jobs=1,
     )

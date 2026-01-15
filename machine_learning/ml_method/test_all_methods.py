@@ -16,10 +16,11 @@ from utils.machine_learning_tools import (
 )
 
 
-dataset_type = "statistical_features"
-# dataset_type = "features"
+# dataset_type = "statistical_features"
+dataset_type = "features"
 # dataset_type = "processed"
 # dataset_type = "pca"
+# dataset_type = "feature_combined"
 
 if dataset_type == "statistical_features":
     data_dir = [
@@ -57,6 +58,17 @@ elif dataset_type == "processed":
 elif dataset_type == "pca":
     data_dir = ["machine_learning/data/Ischemia_Dataset_flat_pca/"]
     model_save_dir = "machine_learning/data/model/pca/ml_model"
+
+elif dataset_type == "feature_combined":
+    data_dir = [
+        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_combined_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_combined_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_combined_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_combined_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_combined_features_dataset/",
+        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_combined_features_dataset/",
+    ]
+    model_save_dir = "machine_learning/data/model/combined_features/ml_model"
 
 else:
     raise ValueError(f"Unknown dataset_type: {dataset_type}")

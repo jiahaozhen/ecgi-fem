@@ -241,6 +241,168 @@ def project_bsp_on_surface(bsp_data, original_pts=load_bsp_pts(), length=50, wid
         surface_bsp[t] = grid_z
 
 
+def _extract_single_lead_features(signal, fs=1000):
+    """
+    针对单次心跳片段提取形态学特征 (考虑信号绝对值进行波形定位)
+    :param signal: 单次心拍的幅值数组
+    :param fs: 采样率 (Hz)
+    :return: 包含特征的字典
+    """
+    features = {}
+    n = len(signal)
+
+    # --- 1. 定位 R 波 (片段内的绝对最大值) ---
+    r_idx = np.argmax(np.abs(signal))
+    features['R_amplitude'] = signal[r_idx]
+    # Return time instead of index
+    features['R_time'] = r_idx / fs * 1000  # ms
+
+    # 判断 R 波的主方向 (正向或负向)
+    # 如果 R 波为正，则 Q/S 为波谷 (min)；如果 R 波为负，则 Q/S 为波峰 (max)
+    if features['R_amplitude'] >= 0:
+        find_extremum = np.argmin
+    else:
+        find_extremum = np.argmax
+
+    # --- 2. 定位 Q 波与 S 波 ---
+    # 搜索 R 前 50ms 寻找 Q
+    q_window = signal[max(0, r_idx - int(0.05 * fs)) : r_idx]
+    if len(q_window) > 0:
+        q_local_idx = find_extremum(q_window)
+        q_idx = r_idx - len(q_window) + q_local_idx
+        features['Q_amplitude'] = signal[q_idx]
+        features['Q_time'] = q_idx / fs * 1000  # ms
+
+    # 搜索 R 后 50ms 寻找 S
+    s_window = signal[r_idx : min(n, r_idx + int(0.05 * fs))]
+    if len(s_window) > 0:
+        s_local_idx = find_extremum(s_window)
+        s_idx = r_idx + s_local_idx
+        features['S_amplitude'] = signal[s_idx]
+        features['S_time'] = s_idx / fs * 1000  # ms
+
+    # --- 3. 定位 T 波 (R波之后 100ms 到 450ms 之间的最大值) ---
+    # T 波可能与 R 波同向或反向，这里使用绝对值最大来定位
+    dt = 1000.0 / fs  # ms per sample (for feature calculation)
+    t_start = r_idx + int(0.2 * fs)
+    t_end = min(n, r_idx + int(0.45 * fs))
+
+    t_idx = t_amp = t_latency = t_width = t_area = t_sign = np.nan
+
+    if t_start < n:
+        t_window = signal[t_start:t_end]
+        if len(t_window) > 0:
+            t_local_idx = np.argmax(np.abs(t_window))
+            t_idx = t_start + t_local_idx
+
+            t_amp = signal[t_idx]
+            t_latency = t_idx * dt
+            t_sign = np.sign(t_amp)
+
+            features['T_amplitude'] = t_amp
+            features['T_time'] = t_idx / fs * 1000  # ms
+            features['T_peak_time'] = t_idx / fs * 1000  # ms
+
+            # T wave boundaries (10% peak threshold)
+            thresh = 0.1 * abs(t_amp)
+
+            # Search within the T window
+            # Convert local index to window-relative index
+            local_peak = t_local_idx
+
+            # Find left boundary
+            left_mask = np.abs(t_window[:local_peak]) <= thresh
+            # Find the last index (closest to peak) that is below threshold
+            left_indices = np.where(left_mask)[0]
+            if len(left_indices) > 0:
+                left = (
+                    left_indices[-1] + 1
+                )  # Use the point just after it goes above threshold
+            else:
+                left = 0  # No point below threshold found to the left
+
+            # Find right boundary
+            right_mask = np.abs(t_window[local_peak + 1 :]) <= thresh
+            right_indices = np.where(right_mask)[0]
+            if len(right_indices) > 0:
+                right = (
+                    local_peak + 1 + right_indices[0] - 1
+                )  # Use point just before it drops
+            else:
+                right = len(t_window) - 1
+
+            t_width = (right - left + 1) * dt
+            t_area = np.sum(t_window[left : right + 1]) * dt
+
+    features["T_peak_time"] = t_idx / fs * 1000 if not np.isnan(t_idx) else np.nan  # ms
+    features["T_peak_amplitude"] = t_amp
+    features["T_peak_latency"] = t_latency
+    features["T_width"] = t_width
+    features["T_area"] = t_area
+    features["T_sign"] = t_sign
+
+    # --- 4. Extract ST Segment Information ---
+    st_level_60 = st_level_80 = st_slope = st_area = st_min = st_mean = np.nan
+
+    if 'S_time' in features:
+        # Backward compatibility for calculation logic requiring indices
+        # We can reconstruct index from time (ms): idx = int(time * fs / 1000)
+        s_idx = int(features['S_time'] * fs / 1000)
+        j_idx = s_idx + int(0.04 * fs)  # J point assumed 40ms after S
+        features['J_time'] = j_idx * dt
+
+        def mean_at_ms(start_idx, ms, window_ms=10):
+            center = start_idx + int(ms * fs / 1000)
+            half = int(window_ms * fs / 1000 / 2)
+            a = max(0, center - half)
+            b = min(n, center + half + 1)
+            return np.mean(signal[a:b]) if a < b else np.nan
+
+        st_level_60 = mean_at_ms(j_idx, 60)
+        st_level_80 = mean_at_ms(j_idx, 80)
+
+        st_start = j_idx
+        st_end = min(n, j_idx + int(0.08 * fs))  # 80ms window
+
+        # Avoid T wave overlap
+        if not np.isnan(t_idx):
+            st_end = min(st_end, int(t_idx))
+
+        if st_end > st_start:
+            st_seg = signal[st_start:st_end]
+            if len(st_seg) > 1:
+                t_seg_ms = np.arange(len(st_seg)) * dt
+                try:
+                    st_slope = np.polyfit(t_seg_ms, st_seg, 1)[0]
+                except np.linalg.LinAlgError:
+                    st_slope = 0
+                st_area = np.sum(st_seg) * dt
+                st_min = np.min(st_seg)
+                st_mean = np.mean(st_seg)
+
+    features["ST_level_60"] = st_level_60
+    features["ST_level_80"] = st_level_80
+    features["ST_slope"] = st_slope
+    features["ST_area"] = st_area
+    features["ST_min"] = st_min
+    # Filter features to return only ST and T wave features
+    final_features = {
+        "ST_level_60": st_level_60,
+        "ST_level_80": st_level_80,
+        "ST_slope": st_slope,
+        "ST_area": st_area,
+        "ST_min": st_min,
+        "ST_mean": st_mean,
+        "T_peak_amplitude": t_amp,
+        "T_peak_latency": t_latency,
+        "T_width": t_width,
+        "T_area": t_area,
+        "T_sign": t_sign,
+    }
+
+    return final_features
+
+
 def extract_features(data, fs=1000):
     """
     Extract ECG features from (T, D) data.
@@ -255,140 +417,17 @@ def extract_features(data, fs=1000):
     - features_df: DataFrame with features for each lead.
     """
     n_samples, n_leads = data.shape
-    dt = 1000.0 / fs  # ms per sample
 
     features = []
 
     for lead_idx in range(n_leads):
         signal = data[:, lead_idx]
 
-        # 1. Baseline correction (using first 20ms)
-        baseline_window = int(20 / dt)
-        if baseline_window < 1:
-            baseline_window = 1
-        baseline = np.mean(signal[:baseline_window])
-        signal_corrected = signal - baseline
+        # Denoise the signal
+        signal = gaussian_filter1d(signal, sigma=2.0)
 
-        # 2. Find R peak
-        # We assume the R peak is the maximum absolute value in the first half of the signal
-        # (to avoid confusing it with a large T wave in the second half)
-        search_len = min(n_samples, int(300 / dt))
-        r_idx = np.argmax(np.abs(signal_corrected[:search_len]))
-
-        # 3. Find J point (QRS end)
-        # Heuristic: J point is approximately 40ms after R peak.
-        # In a real application, this should be detected by slope changes.
-        j_idx = r_idx + int(40 / dt)
-        j_idx = min(n_samples - 1, j_idx)
-
-        # 4. ST Segment Features
-        # ST window: J+20ms to J+100ms (or J+80ms for calculation)
-
-        def get_val_at_ms(start_idx, ms_offset):
-            idx = start_idx + int(ms_offset / dt)
-            if 0 <= idx < n_samples:
-                return signal_corrected[idx]
-            return np.nan
-
-        st_level_60 = get_val_at_ms(j_idx, 60)
-        st_level_80 = get_val_at_ms(j_idx, 80)
-
-        # Slope: Linear fit between J+20 and J+80
-        st_start_idx = j_idx + int(20 / dt)
-        st_end_idx = j_idx + int(80 / dt)
-
-        st_slope = np.nan
-        st_area = np.nan
-        st_min = np.nan
-        st_mean = np.nan
-
-        if (
-            st_start_idx < n_samples
-            and st_end_idx < n_samples
-            and st_end_idx > st_start_idx
-        ):
-            st_segment = signal_corrected[st_start_idx : st_end_idx + 1]
-            time_axis = np.arange(len(st_segment)) * dt
-
-            if len(st_segment) > 1:
-                # Slope (mV/ms)
-                poly = np.polyfit(time_axis, st_segment, 1)
-                st_slope = poly[0]
-
-                # Area (mV * ms)
-                st_area = np.sum(st_segment) * dt
-
-                # Min / Mean
-                st_min = np.min(st_segment)
-                st_mean = np.mean(st_segment)
-
-        # 5. T wave Features
-        # Search window: J + 100ms to end
-        t_search_start = j_idx + int(100 / dt)
-        t_search_end = n_samples
-
-        t_amp = np.nan
-        t_latency = np.nan
-        t_width = np.nan
-        t_area = np.nan
-        t_sign = np.nan
-        t_idx = np.nan
-
-        if t_search_start < t_search_end:
-            t_window = signal_corrected[t_search_start:t_search_end]
-            if len(t_window) > 0:
-                # Find T peak (max abs)
-                t_local_idx = np.argmax(np.abs(t_window))
-                t_idx = t_search_start + t_local_idx
-
-                t_amp = signal_corrected[t_idx]
-                t_latency = t_idx * dt
-                t_sign = np.sign(t_amp)
-
-                # T Width: FWHM (Full Width at Half Maximum)
-                half_max = t_amp * 0.5
-
-                # Search left from peak
-                left_idx = t_local_idx
-                while left_idx > 0:
-                    if np.sign(t_window[left_idx]) != np.sign(t_amp) or abs(
-                        t_window[left_idx]
-                    ) < abs(half_max):
-                        break
-                    left_idx -= 1
-
-                # Search right from peak
-                right_idx = t_local_idx
-                while right_idx < len(t_window) - 1:
-                    if np.sign(t_window[right_idx]) != np.sign(t_amp) or abs(
-                        t_window[right_idx]
-                    ) < abs(half_max):
-                        break
-                    right_idx += 1
-
-                t_width = (right_idx - left_idx) * dt
-
-                # T Area: Integral of the T wave
-                # We integrate the part of the wave around the peak that has the same sign
-                mask = np.sign(t_window) == np.sign(t_amp)
-                t_area = np.sum(t_window[mask]) * dt
-
-        lead_features = {
-            'R_time': r_idx * dt,
-            'J_time': j_idx * dt,
-            'T_peak_time': t_idx * dt,
-            'ST_level_60': st_level_60,
-            'ST_level_80': st_level_80,
-            'ST_slope': st_slope,
-            'ST_area': st_area,
-            'ST_min': st_min,
-            'ST_mean': st_mean,
-            'T_peak_amplitude': t_amp,
-            'T_peak_latency': t_latency,
-            'T_width': t_width,
-            'T_area': t_area,
-            'T_sign': t_sign,
-        }
+        # Extract features using the improved single lead extractor
+        lead_features = _extract_single_lead_features(signal, fs=fs)
         features.append(lead_features)
 
     return pd.DataFrame(features)
@@ -482,26 +521,7 @@ def batch_extract_statistical_features(data_batch, fs=1000):
     B, T, D = data_batch.shape
 
     features_list = []
-    feature_names = [
-        'ST_level_60_mean',
-        'ST_level_60_std',
-        'ST_level_80_mean',
-        'ST_level_80_std',
-        'ST_slope_mean',
-        'ST_slope_std',
-        'ST_area_mean',
-        'ST_area_std',
-        'ST_min_mean',
-        'ST_min_std',
-        'ST_mean_mean',
-        'ST_mean_std',
-        'T_peak_amplitude_mean',
-        'T_peak_amplitude_std',
-        'T_width_mean',
-        'T_width_std',
-        'T_area_mean',
-        'T_area_std',
-    ]
+    feature_names = []
 
     print(f"Starting batch processing for {B} records...")
 
@@ -511,33 +531,36 @@ def batch_extract_statistical_features(data_batch, fs=1000):
         try:
             df = extract_features(record_data, fs=fs)
 
-            # Calculate statistical features across all leads
-            record_features = [
-                df['ST_level_60'].mean(),
-                df['ST_level_60'].std(),
-                df['ST_level_80'].mean(),
-                df['ST_level_80'].std(),
-                df['ST_slope'].mean(),
-                df['ST_slope'].std(),
-                df['ST_area'].mean(),
-                df['ST_area'].std(),
-                df['ST_min'].mean(),
-                df['ST_min'].std(),
-                df['ST_mean'].mean(),
-                df['ST_mean'].std(),
-                df['T_peak_amplitude'].mean(),
-                df['T_peak_amplitude'].std(),
-                df['T_width'].mean(),
-                df['T_width'].std(),
-                df['T_area'].mean(),
-                df['T_area'].std(),
-            ]
+            # Initialize feature names on first success
+            if len(feature_names) == 0:
+                for col in df.columns:
+                    feature_names.append(f"{col}_mean")
+                    feature_names.append(f"{col}_std")
 
-            features_list.append(record_features)
+            # Calculate statistical features across all leads
+            record_stats = []
+            for col in df.columns:
+                record_stats.append(df[col].mean())
+                record_stats.append(df[col].std())
+
+            features_list.append(record_stats)
 
         except Exception as e:
             print(f"Error processing record {i}: {e}")
-            features_list.append([np.nan] * len(feature_names))
+            features_list.append(None)
 
-    features_array = np.array(features_list)
+    # Handle case where no records were successfully processed
+    if len(feature_names) == 0:
+        return np.array([]), []
+
+    F = len(feature_names)
+    features_array = np.full((B, F), np.nan)
+
+    for i, feats in enumerate(features_list):
+        if feats is not None:
+            if len(feats) == F:
+                features_array[i] = feats
+            else:
+                print(f"Shape mismatch for record {i}")
+
     return features_array, feature_names

@@ -38,8 +38,7 @@ def process_dataset(input_dir, output_dir, fs=1000):
                 seg_ids = data["y"][:]
 
             # 提取特征
-            # batch_extract_features 返回 (B, D, F) 和 feature_names
-            features, feature_names = batch_extract_features(d_data, fs=fs)
+            features, _ = batch_extract_features(d_data, fs=fs)
 
             if features.size > 0:
                 save_feature_data(

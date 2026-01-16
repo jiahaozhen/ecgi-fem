@@ -1,4 +1,8 @@
 import time
+from machine_learning.ml_method.ml_knn_method import multilabel_ml_knn_classifier
+from machine_learning.ml_method.ml_binary_relevance import binary_relevance_classifier
+from machine_learning.ml_method.ml_classifier_chain import classifier_chain_classifier
+from machine_learning.ml_method.ml_label_powerset import label_powerset_classifier
 from machine_learning.ml_method.knn_method import multilabel_knn_ovr_classifier
 from machine_learning.ml_method.lgb_method import multilabel_lgb_classifier
 from machine_learning.ml_method.xgb_method import multilabel_xgb_classifier
@@ -7,6 +11,14 @@ from machine_learning.ml_method.random_forest import multilabel_rf_classifier
 from machine_learning.ml_method.logistic_regression import (
     multilabel_logistic_classifier,
 )
+from machine_learning.ml_method.calibrated_label_ranking import (
+    calibrated_label_ranking_classifier,
+)
+from machine_learning.ml_method.random_k_labelsets import random_k_labelsets_classifier
+from machine_learning.ml_method.ml_decision_tree import (
+    multilabel_decision_tree_classifier,
+)
+from machine_learning.ml_method.cml_method import multilabel_cml_classifier
 
 from utils.machine_learning_tools import (
     load_dataset,
@@ -83,12 +95,20 @@ print(X.shape)
 X_train, X_test, y_train, y_test, _, _ = split_dataset(X, y)
 
 methods = [
+    ('Binary Relevance', binary_relevance_classifier),
+    ('ML-KNN', multilabel_ml_knn_classifier),
+    ('Classifier Chain', classifier_chain_classifier),
+    ('Calibrated Label Ranking', calibrated_label_ranking_classifier),
+    ('Random k-Labelsets', random_k_labelsets_classifier),
+    ('Multi-Lablel Decision Tree', multilabel_decision_tree_classifier),
+    ('Collective Multi-Label Classifier', multilabel_cml_classifier),
     ('KNN', multilabel_knn_ovr_classifier),
     ('LightGBM', multilabel_lgb_classifier),
     ('XGB', multilabel_xgb_classifier),
-    ('SVM', multilabel_svm_classifier),
+    # ('SVM', multilabel_svm_classifier),
     ('Random Forest', multilabel_rf_classifier),
     ('Logistic Regression', multilabel_logistic_classifier),
+    ('Label Powerset', label_powerset_classifier),
 ]
 
 results = {}

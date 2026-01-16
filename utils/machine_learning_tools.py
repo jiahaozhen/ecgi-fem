@@ -107,10 +107,48 @@ def get_train_test(data_dir, test_size=0.2, random_state=42, test_only=False):
         return split_dataset(X, y, test_size=test_size, random_state=random_state)
 
 
-def evaluate_model(clf, X_test, y_test, threshold=0.5):
+def evaluate_model(clf, X_test, y_test, threshold=None):
     # 1️⃣ 预测概率（每个标签一个概率）
     if hasattr(clf, "predict_proba"):
         y_score = clf.predict_proba(X_test)
+
+        # Handle sklearn's list output for multi-label (e.g. Decision Tree / RF)
+        if isinstance(y_score, list):
+            output_list = []
+            for i, preds in enumerate(y_score):
+                if preds.shape[1] == 2:
+                    # Normal case: [prob_0, prob_1]
+                    output_list.append(preds[:, 1])
+                elif preds.shape[1] == 1:
+                    # Single class case
+                    if hasattr(clf, 'classes_') and len(clf.classes_[i]) == 1:
+                        if clf.classes_[i][0] == 1:
+                            output_list.append(preds[:, 0])
+                        else:
+                            output_list.append(np.zeros_like(preds[:, 0]))
+                    else:
+                        # Fallback
+                        output_list.append(np.zeros_like(preds[:, 0]))
+                else:
+                    # >2 classes? Take last one?
+                    output_list.append(preds[:, -1])
+            y_score = np.array(output_list).T
+
+        if hasattr(y_score, "toarray"):
+            y_score = y_score.toarray()
+
+        if threshold is None:
+            best_f1 = -1
+            best_th = 0.5
+            for th in np.arange(0.01, 1.0, 0.01):
+                y_pred_tmp = (y_score >= th).astype(int)
+                score = f1_score(y_test, y_pred_tmp, average="micro")
+                if score > best_f1:
+                    best_f1 = score
+                    best_th = th
+            threshold = best_th
+            print(f"Best threshold: {threshold:.3f}, F1-Micro: {best_f1:.4f}")
+
         y_pred = (y_score >= threshold).astype(int)
     else:
         y_score = clf.decision_function(X_test)

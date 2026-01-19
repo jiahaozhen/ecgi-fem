@@ -173,14 +173,16 @@ def train_model(
     return model
 
 
-def evaluate_model(model, loader, threshold=0.5, device="cuda"):
+def evaluate_model(
+    model, loader, threshold=0.5, device="cuda", optimize_threshold=True
+):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model.eval()
     model.to(device)
 
-    all_preds = []
+    all_probs = []
     all_targets = []
 
     with torch.no_grad():
@@ -190,13 +192,33 @@ def evaluate_model(model, loader, threshold=0.5, device="cuda"):
 
             logits = model(X)
             probs = torch.sigmoid(logits)
-            preds = (probs > threshold).int()
 
-            all_preds.append(preds.cpu())
+            all_probs.append(probs.cpu())
             all_targets.append(y.cpu())
 
-    y_pred = torch.cat(all_preds).numpy()
+    y_probs = torch.cat(all_probs).numpy()
     y_true = torch.cat(all_targets).numpy()
+
+    if optimize_threshold:
+        best_threshold = threshold
+        best_f1 = -1.0
+        # Search range from 0.1 to 0.9 with step 0.05
+        threshold_range = np.arange(0.1, 0.95, 0.05)
+
+        print("\n--- Optimizing Threshold ---")
+        for th in threshold_range:
+            y_pred_tmp = (y_probs > th).astype(int)
+            f1_tmp = f1_score(y_true, y_pred_tmp, average="micro")
+            if f1_tmp > best_f1:
+                best_f1 = f1_tmp
+                best_threshold = th
+
+        print(
+            f"Best Threshold found: {best_threshold:.3f}, Best Micro F1: {best_f1:.4f}"
+        )
+        threshold = best_threshold
+
+    y_pred = (y_probs > threshold).astype(int)
 
     h_loss = hamming_loss(y_true, y_pred)
     f1_score_micro = f1_score(y_true, y_pred, average="micro")
@@ -205,6 +227,7 @@ def evaluate_model(model, loader, threshold=0.5, device="cuda"):
 
     # 3️⃣ 评估
     # print("Threshold:", threshold)
+    print(f"Threshold: {threshold:.3f}")
     print("Hamming loss:", h_loss)
     print("Micro F1:", f1_score_micro)
     print("Macro F1:", f1_score_macro)
@@ -216,6 +239,7 @@ def evaluate_model(model, loader, threshold=0.5, device="cuda"):
         "Micro F1": f1_score_micro,
         "Macro F1": f1_score_macro,
         "accuracy score": a_score,
+        "threshold": threshold,
     }
 
 

@@ -44,11 +44,11 @@ class TransformerClassifier(nn.Module):
 
     def forward(self, x):
         # x: (B, T, D)
-        x = self.proj(x)
+        x = self.proj(x)  # (B, T, hidden)
         for block in self.blocks:
-            x = block(x)
-        x = x.mean(dim=1)
-        x = self.dropout(x)
+            x = block(x)  # (B, T, hidden)
+        x = x.mean(dim=1)  # (B, hidden)
+        x = self.dropout(x)  # (B, hidden)
         return self.fc(x)  # logits (B, n_classes)
 
 

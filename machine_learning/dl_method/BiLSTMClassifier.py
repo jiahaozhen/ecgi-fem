@@ -25,8 +25,7 @@ class BiLSTMBlock(nn.Module):
     def forward(self, x):
         # x: (B, T, D)
         out, _ = self.lstm(x)
-        out = self.dropout(out)
-        return out
+        return self.dropout(out)
 
 
 # --------------------
@@ -36,21 +35,22 @@ class BiLSTMClassifier(nn.Module):
     def __init__(self, input_dim, n_classes=17, hidden_dim=128, num_layers=2):
         super().__init__()
         self.bilstm = BiLSTMBlock(input_dim, hidden_dim, num_layers)
-        self.fc = nn.Linear(hidden_dim * 2, n_classes)
         self.dropout = nn.Dropout(0.5)
+        self.fc = nn.Linear(hidden_dim * 2, n_classes)
 
     def forward(self, x):
         # x: (B, T, D)
-        out = self.bilstm(x)
-        out = out.mean(dim=1)  # Global Average Pooling over time
+        out = self.bilstm(x)  # (B, T, 2*hidden_dim)
+        out = out.mean(dim=1)  # GAP over time -> (B, 2*hidden_dim)
         out = self.dropout(out)
-        return self.fc(out)
+        return self.fc(out)  # (B, n_classes)
 
 
 # --------------------
 # Main
 # --------------------
 if __name__ == "__main__":
+
     data_dir = [
         "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
         "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",

@@ -17,12 +17,13 @@ class GRUBlock(nn.Module):
             hidden_dim,
             num_layers=num_layers,
             batch_first=True,
-            dropout=dropout if num_layers > 1 else 0.0,
+            dropout=dropout,
             bidirectional=True,
         )
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        # x: (B, T, D)
         out, _ = self.gru(x)
         return self.dropout(out)
 
@@ -38,11 +39,11 @@ class BiGRUClassifier(nn.Module):
         self.fc = nn.Linear(hidden_dim * 2, n_classes)
 
     def forward(self, x):
-        out = self.bigru(x)  # (B, T, 2H)
-        out = out.mean(dim=1)  # Global Average Pooling
+        # x: (B, T, D)
+        out = self.bigru(x)  # (B, T, 2*hidden_dim)
+        out = out.mean(dim=1)  # GAP over time -> (B, 2*hidden_dim)
         out = self.dropout(out)
-        logits = self.fc(out)
-        return logits
+        return self.fc(out)  # (B, n_classes)
 
 
 # --------------------

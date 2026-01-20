@@ -26,9 +26,6 @@ class PositionalEncoding(nn.Module):
         self.register_buffer("pe", pe)
 
     def forward(self, x):
-        """
-        x: [B, T, D]
-        """
         return x + self.pe[:, : x.size(1)]
 
 
@@ -79,25 +76,18 @@ class CNNTransformer(nn.Module):
         self.fc = nn.Linear(d_model, num_labels)
 
     def forward(self, x):
-        """
-        x: [B, T, C]
-        """
-        # CNN: [B, C, T]
-        x = x.permute(0, 2, 1)
-        x = self.cnn(x)  # [B, D, T']
+        # x: (B, T, D)
+        x = x.permute(0, 2, 1)  # (B, D, T)
+        x = self.cnn(x)  # (B, d_model, T/2)
 
-        # Transformer: [B, T', D]
-        x = x.permute(0, 2, 1)
-        x = self.pos_encoder(x)
+        x = x.permute(0, 2, 1)  # (B, T/2, d_model)
+        x = self.pos_encoder(x)  # (B, T/2, d_model)
 
-        x = self.transformer(x)  # [B, T', D]
+        x = self.transformer(x)  # (B, T/2, d_model)
 
         # -------- 时间维池化 --------
-        x = torch.mean(x, dim=1)  # [B, D]
-
-        logits = self.fc(x)  # [B, num_labels]
-
-        return logits
+        x = torch.mean(x, dim=1)  # (B, d_model)
+        return self.fc(x)  # (B, num_labels)
 
 
 # -------------------

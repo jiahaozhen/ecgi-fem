@@ -19,7 +19,7 @@ class ResidualBlock(nn.Module):
         self.ln2 = nn.LayerNorm(dim)
 
     def forward(self, x):
-        # x: (B, C, T)
+        # x: (B, D, T)
         residual = x
         out = self.conv1(x)
         out = F.relu(self.ln1(out.transpose(1, 2)).transpose(1, 2))
@@ -29,13 +29,11 @@ class ResidualBlock(nn.Module):
 
 
 # --------------------
-# Improved CNN Classifier
+# Residual CNN Classifier
 # --------------------
-class ImprovedCNN(nn.Module):
-    def __init__(self, input_dim, n_classes=17):
+class ResCNNClassifier(nn.Module):
+    def __init__(self, input_dim, hidden=128, n_classes=17):
         super().__init__()
-
-        hidden = 128
 
         self.proj = nn.Conv1d(input_dim, hidden, kernel_size=3, padding=1)
         self.block1 = ResidualBlock(hidden)
@@ -44,13 +42,16 @@ class ImprovedCNN(nn.Module):
         self.fc = nn.Linear(hidden, n_classes)
 
     def forward(self, x):
-        x = x.transpose(1, 2)  # (B, T, D) → (B, D, T)
-        x = F.relu(self.proj(x))
-        x = self.block1(x)
-        x = self.block2(x)
-        x = x.mean(dim=2)  # GAP
+        # x: (B, T, D)
+        x = x.transpose(1, 2)  # (B, D, T)
+        x = F.relu(self.proj(x))  # (B, hidden, T)
+
+        x = self.block1(x)  # (B, hidden, T)
+        x = self.block2(x)  # (B, hidden, T)
+
+        x = x.mean(dim=2)  # GAP over time -> (B, hidden)
         x = self.dropout(x)
-        return self.fc(x)
+        return self.fc(x)  # (B, n_classes)
 
 
 # --------------------
@@ -75,6 +76,6 @@ if __name__ == "__main__":
     X_sample, _, _ = next(iter(train_loader))
     input_dim = X_sample.shape[-1]
 
-    model = ImprovedCNN(input_dim)
+    model = ResCNNClassifier(input_dim)
     model = train_model(model, train_loader, epochs=30, lr=1e-3)
     evaluate_model(model, test_loader)

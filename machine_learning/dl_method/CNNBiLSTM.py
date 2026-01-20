@@ -45,23 +45,18 @@ class CNNBiLSTM(nn.Module):
         self.fc = nn.Linear(2 * lstm_hidden, num_labels)
 
     def forward(self, x):
-        """
-        x: [B, T, C]  (batch, time, channel)
-        """
-        # CNN 需要 [B, C, T]
-        x = x.permute(0, 2, 1)  # [B, C, T]
-        x = self.cnn(x)  # [B, C', T']
+        # x: (B, T, D)
+        x = x.permute(0, 2, 1)  # (B, D, T)
+        x = self.cnn(x)  # (B, cnn_channels, T/2)
 
-        # LSTM 需要 [B, T', C']
-        x = x.permute(0, 2, 1)  # [B, T', C']
+        x = x.permute(0, 2, 1)  # (B, T/2, cnn_channels)
 
-        lstm_out, _ = self.bilstm(x)  # [B, T', 2H]
+        lstm_out, _ = self.bilstm(x)  # (B, T/2, 2*lstm_hidden)
 
         # -------- 时间维池化（推荐）--------
-        x = torch.mean(lstm_out, dim=1)  # [B, 2H]
+        x = torch.mean(lstm_out, dim=1)  # (B, 2*lstm_hidden)
 
-        logits = self.fc(x)  # [B, num_labels]
-        return logits
+        return self.fc(x)  # (B, num_labels)
 
 
 # --------------------

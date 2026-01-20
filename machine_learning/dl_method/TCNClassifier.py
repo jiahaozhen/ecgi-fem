@@ -60,14 +60,14 @@ class TCNClassifier(nn.Module):
     def forward(self, x):
         # x: (B, T, D)
         x = x.transpose(1, 2)  # (B, D, T)
-        x = self.proj(x)
+        x = self.proj(x)  # (B, hidden_dim, T)
 
         for block in self.blocks:
-            x = block(x)
+            x = block(x)  # (B, hidden_dim, T)
 
         x = x.mean(dim=2)  # GAP over time -> (B, hidden_dim)
         x = self.dropout(x)
-        return self.fc(x)  # logits (B, n_classes)
+        return self.fc(x)  # (B, n_classes)
 
 
 # --------------------

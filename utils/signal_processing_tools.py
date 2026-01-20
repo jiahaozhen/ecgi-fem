@@ -241,11 +241,77 @@ def project_bsp_on_surface(bsp_data, original_pts=load_bsp_pts(), length=50, wid
         surface_bsp[t] = grid_z
 
 
-def _extract_single_lead_features(signal, fs=1000):
+def _get_fiducial_indices(signal, fs=1000):
+    n = len(signal)
+    indices = {'r_idx': 0, 's_idx': 0, 't_idx': -1, 't_onset': 0, 't_offset': 0}
+
+    if n == 0:
+        return indices
+
+    signal = np.nan_to_num(signal)
+
+    # --- 1. R wave ---
+    r_idx = np.argmax(np.abs(signal))
+    r_amp = signal[r_idx]
+    indices['r_idx'] = r_idx
+
+    # --- 2. S wave ---
+    if r_amp >= 0:
+        find_extremum = np.argmin
+    else:
+        find_extremum = np.argmax
+
+    s_idx = r_idx
+    s_end_search = min(n, r_idx + int(0.05 * fs))
+    if s_end_search > r_idx:
+        s_window = signal[r_idx:s_end_search]
+        if len(s_window) > 0:
+            s_local_idx = find_extremum(s_window)
+            s_idx = r_idx + s_local_idx
+    indices['s_idx'] = s_idx
+
+    # --- 3. T wave ---
+    t_start = r_idx + int(0.2 * fs)
+    t_end = min(n, r_idx + int(0.45 * fs))
+
+    if t_start < n and t_end > t_start:
+        t_window = signal[t_start:t_end]
+        if len(t_window) > 0:
+            t_local_idx = np.argmax(np.abs(t_window))
+            t_idx = t_start + t_local_idx
+
+            t_amp_val = signal[t_idx]
+            indices['t_idx'] = t_idx
+
+            thresh = 0.1 * abs(t_amp_val)
+
+            # Left
+            left_search = t_window[:t_local_idx]
+            left_indices = np.where(np.abs(left_search) <= thresh)[0]
+            if len(left_indices) > 0:
+                left_local = left_indices[-1] + 1
+            else:
+                left_local = 0
+            indices['t_onset'] = t_start + left_local
+
+            # Right
+            right_search = t_window[t_local_idx + 1 :]
+            right_indices = np.where(np.abs(right_search) <= thresh)[0]
+            if len(right_indices) > 0:
+                right_local = t_local_idx + 1 + right_indices[0] - 1
+            else:
+                right_local = len(t_window) - 1
+            indices['t_offset'] = t_start + right_local
+
+    return indices
+
+
+def _extract_single_lead_features(signal, fs=1000, fiducials=None):
     """
     针对单次心跳片段提取形态学特征 (考虑信号绝对值进行波形定位)
     :param signal: 单次心拍的幅值数组
     :param fs: 采样率 (Hz)
+    :param fiducials: Dict containing global fiducial indices (r_idx, s_idx, t_idx, t_onset, t_offset)
     :return: 包含特征的字典
     """
     # Initialize all simple features with 0.0 to avoid NaNs
@@ -281,72 +347,29 @@ def _extract_single_lead_features(signal, fs=1000):
     signal = np.nan_to_num(signal)
     dt = 1000.0 / fs  # ms per sample
 
-    # --- 1. 定位 R 波 (片段内的绝对最大值) ---
-    r_idx = np.argmax(np.abs(signal))
-    r_amp = signal[r_idx]
+    if fiducials is None:
+        fiducials = _get_fiducial_indices(signal, fs)
 
-    # --- 2. 定位 S 波 ---
-    # 如果 R 波为正，则 S 为 R 波后的局部最小值
-    # 如果 R 波为负，则 S 为 R 波后的局部最大值
-    if r_amp >= 0:
-        find_extremum = np.argmin
-    else:
-        find_extremum = np.argmax
+    r_idx = fiducials['r_idx']
+    s_idx = fiducials['s_idx']
+    t_idx = fiducials['t_idx']
+    t_onset = fiducials.get('t_onset', 0)
+    t_offset = fiducials.get('t_offset', 0)
 
-    s_idx = r_idx  # Fallback
-    # Search S within 50ms after R
-    s_end_search = min(n, r_idx + int(0.05 * fs))
-    if s_end_search > r_idx:
-        s_window = signal[r_idx:s_end_search]
-        if len(s_window) > 0:
-            s_local_idx = find_extremum(s_window)
-            s_idx = r_idx + s_local_idx
+    # --- T Wave ---
+    if t_idx != -1 and t_idx < n:
+        t_amp = signal[t_idx]
+        t_latency = t_idx * dt
+        t_sign = np.sign(t_amp)
 
-    # --- 3. 定位 T 波 (R波之后 200ms 到 450ms 之间的最大值) ---
-    t_start = r_idx + int(0.2 * fs)
-    t_end = min(n, r_idx + int(0.45 * fs))
-    t_idx = -1  # Invalid index
+        safe_onset = max(0, min(t_onset, n - 1))
+        safe_offset = max(0, min(t_offset, n - 1))
 
-    if t_start < n:
-        if t_end > t_start:
-            t_window = signal[t_start:t_end]
-            if len(t_window) > 0:
-                t_local_idx = np.argmax(np.abs(t_window))
-                t_idx = t_start + t_local_idx
+        if safe_offset >= safe_onset:
+            t_width = (safe_offset - safe_onset + 1) * dt
+            t_area = np.sum(signal[safe_onset : safe_offset + 1]) * dt
 
-                t_amp = signal[t_idx]
-                t_latency = t_idx * dt
-                t_sign = np.sign(t_amp)
-
-                # Calculate T Width and Area
-                thresh = 0.1 * abs(t_amp)
-
-                # Left boundary
-                # Scan backwards from peak within window
-                # t_window corresponds to signal[t_start:t_end]
-                # peak is at t_local_idx in t_window
-
-                # left side:
-                left_search = t_window[:t_local_idx]
-                left_indices = np.where(np.abs(left_search) <= thresh)[0]
-                if len(left_indices) > 0:
-                    left_local = left_indices[-1] + 1
-                else:
-                    left_local = 0
-
-                # right side:
-                right_search = t_window[t_local_idx + 1 :]
-                right_indices = np.where(np.abs(right_search) <= thresh)[0]
-                if len(right_indices) > 0:
-                    right_local = t_local_idx + 1 + right_indices[0] - 1
-                else:
-                    right_local = len(t_window) - 1
-
-                t_width = (right_local - left_local + 1) * dt
-                t_area = np.sum(t_window[left_local : right_local + 1]) * dt
-
-    # --- 4. ST Segment Information ---
-    # J point assumed 40ms after S
+    # --- ST Segment Information ---
     j_idx = s_idx + int(0.04 * fs)
 
     # Helper for safe window mean
@@ -360,14 +383,11 @@ def _extract_single_lead_features(signal, fs=1000):
         return 0.0
 
     if j_idx < n:
-        # ST level 60ms and 80ms after J
         st_level_60 = safe_window_mean(j_idx + int(0.06 * fs))
         st_level_80 = safe_window_mean(j_idx + int(0.08 * fs))
 
-        # ST Slope/Area/Min/Mean
         st_seg_end = min(n, j_idx + int(0.08 * fs))
 
-        # Don't overlap with T peak if T exists and is close
         if t_idx != -1 and t_idx > j_idx:
             st_seg_end = min(st_seg_end, t_idx)
 
@@ -417,14 +437,20 @@ def extract_features(data, fs=1000):
 
     features = []
 
+    # Calculate global fiducials from RMS of denoised data
+    # Filter all leads first to get clean RMS
+    data_clean = gaussian_filter1d(data.astype(float), sigma=2.0, axis=0)
+    rms_signal = np.sqrt(np.mean(data_clean**2, axis=1))
+
+    global_fiducials = _get_fiducial_indices(rms_signal, fs=fs)
+
     for lead_idx in range(n_leads):
-        signal = data[:, lead_idx]
+        signal = data_clean[:, lead_idx]
 
-        # Denoise the signal
-        signal = gaussian_filter1d(signal, sigma=2.0)
-
-        # Extract features using the improved single lead extractor
-        lead_features = _extract_single_lead_features(signal, fs=fs)
+        # Extract features using the global fiducials
+        lead_features = _extract_single_lead_features(
+            signal, fs=fs, fiducials=global_fiducials
+        )
         features.append(lead_features)
 
     return pd.DataFrame(features)

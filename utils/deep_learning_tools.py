@@ -80,6 +80,30 @@ class H5Dataset(Dataset):
         return X, y, meta
 
 
+class ReducedDataset(Dataset):
+    def __init__(self, dataset, reducer):
+        self.dataset = dataset
+        self.reducer = reducer
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        X, y, meta = self.dataset[idx]
+
+        # Convert to numpy and add batch dim: (T, D) -> (1, T, D)
+        X_np = X.numpy()
+        X_batch = X_np[np.newaxis, ...]
+
+        # Transform
+        X_red_batch = self.reducer.transform(X_batch)
+
+        # Remove batch dim
+        X_red = X_red_batch[0]
+
+        return torch.tensor(X_red, dtype=torch.float32), y, meta
+
+
 def build_train_test_loaders(
     data_dir,
     batch_size=32,
@@ -87,6 +111,7 @@ def build_train_test_loaders(
     num_workers=4,
     transform=None,
     seed=42,
+    reducer=None,
 ):
     full_dataset = H5Dataset(data_dir, transform=transform)
     total_len = len(full_dataset)
@@ -98,6 +123,33 @@ def build_train_test_loaders(
     g.manual_seed(seed)
 
     train_set, test_set = random_split(full_dataset, [train_len, test_len], generator=g)
+
+    if reducer is not None:
+        print("🔧 Fitting reducer on FULL dataset (as requested for global basis)...")
+        # Create a temp loader to fetch ALL data efficiently
+        temp_loader = DataLoader(
+            full_dataset,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            shuffle=False,
+        )
+
+        all_data_list = []
+        # Calculate total batches for progress tracking if needed
+        for i, (X_batch, _, _) in enumerate(temp_loader):
+            all_data_list.append(X_batch.numpy())
+
+        if len(all_data_list) > 0:
+            X_all = np.concatenate(all_data_list, axis=0)
+            print(f"   Data shape for fitting: {X_all.shape}")
+            reducer.fit(X_all)
+            print("✅ Reducer fitted on full dataset.")
+        else:
+            print("Warning: Dataset is empty, reducer fit skipped.")
+
+        # Wrap datasets
+        train_set = ReducedDataset(train_set, reducer)
+        test_set = ReducedDataset(test_set, reducer)
 
     train_loader = DataLoader(
         train_set,

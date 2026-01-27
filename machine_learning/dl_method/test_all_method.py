@@ -4,7 +4,7 @@ from machine_learning.dl_method.BiGRUClassifier import BiGRUClassifier
 from machine_learning.dl_method.BiLSTMClassifier import BiLSTMClassifier
 from machine_learning.dl_method.CNNBiLSTM import CNNBiLSTM
 from machine_learning.dl_method.CNNTransformer import CNNTransformer
-from machine_learning.dl_method.CNNClassifier import ImprovedCNN
+from machine_learning.dl_method.CNNClassifier import ResCNNClassifier
 from machine_learning.dl_method.TCNClassifier import TCNClassifier
 from machine_learning.dl_method.TransformerClassifier import TransformerClassifier
 from utils.deep_learning_tools import (
@@ -17,7 +17,7 @@ from utils.deep_learning_tools import (
 methods = [
     ('BiGRUClassifier', BiGRUClassifier),
     ('BiLSTMClassifier', BiLSTMClassifier),
-    ('ImprovedCNN', ImprovedCNN),
+    ('ResCNNClassifier', ResCNNClassifier),
     ('CNNBiLSTM', CNNBiLSTM),
     ('CNNTransformer', CNNTransformer),
     ('TCNClassifier', TCNClassifier),
@@ -28,6 +28,8 @@ methods = [
 def test_all_classifiers():
     # dataset_type = "features"
     dataset_type = "processed"
+    # dataset_type = "cnn_ae"
+    # dataset_type = "cnn_ae_feature_concat"
 
     if dataset_type == "features":
         data_dir = [
@@ -50,7 +52,26 @@ def test_all_classifiers():
             "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
         ]
         model_save_dir = "machine_learning/data/model/processed/dl_model"
-
+    elif dataset_type == "cnn_ae":
+        data_dir = [
+            "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_cnn_ae_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_cnn_ae_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_cnn_ae_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_cnn_ae_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_cnn_ae_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_cnn_ae_dataset/",
+        ]
+        model_save_dir = "machine_learning/data/model/cnn_ae/dl_model"
+    elif dataset_type == "cnn_ae_feature_concat":
+        data_dir = [
+            "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_cnn_ae_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_cnn_ae_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_cnn_ae_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_cnn_ae_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_cnn_ae_features_dataset/",
+            "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_cnn_ae_features_dataset/",
+        ]
+        model_save_dir = "machine_learning/data/model/all_concat/dl_model"
     else:
         raise ValueError(f"Unknown dataset_type: {dataset_type}")
 

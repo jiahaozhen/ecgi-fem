@@ -3,10 +3,7 @@ import numpy as np
 import logging
 import h5py
 
-from utils.signal_processing_tools import (
-    batch_extract_features,
-    batch_extract_statistical_features,
-)
+from utils.signal_processing_tools import batch_extract_features
 
 
 def save_feature_data(features, seg_ids, save_dir, partial_idx):
@@ -41,13 +38,8 @@ def process_dataset(input_dir, output_dir, fs=1000):
                 seg_ids = data["y"][:]
 
             # 提取特征
-            features_lead, _ = batch_extract_features(d_data, fs=fs)
-            features_stat, _ = batch_extract_statistical_features(d_data, fs=fs)
-
-            features_lead = features_lead.reshape(features_lead.shape[0], -1)
-            features_stat = features_stat.reshape(features_stat.shape[0], -1)
-
-            features = np.concatenate((features_lead, features_stat), axis=1)
+            features, _ = batch_extract_features(d_data, fs=fs)
+            features = np.transpose(features, (0, 2, 1))  # (B, D, L) -> (B, L, D)
 
             if features.size > 0:
                 save_feature_data(
@@ -68,22 +60,22 @@ def create_features_dataset(
     severity,
     dir_prefix='machine_learning/data/Ischemia_Dataset/',
 ):
-    # 处理 d12_noisy_dataset -> d12_combined_features_dataset
+    # 处理 d12_noisy_dataset -> d12_features_dataset
     process_dataset(
         input_dir=os.path.join(
             dir_prefix, f"{case_name}/{severity}/d12_noisy_dataset/"
         ),
         output_dir=os.path.join(
-            dir_prefix, f"{case_name}/{severity}/d12_combined_features_dataset/"
+            dir_prefix, f"{case_name}/{severity}/d12_features_dataset/"
         ),
     )
-    # 处理 d64_noisy_dataset -> d64_combined_features_dataset
+    # 处理 d64_noisy_dataset -> d64_features_dataset
     process_dataset(
         input_dir=os.path.join(
             dir_prefix, f"{case_name}/{severity}/d64_noisy_dataset/"
         ),
         output_dir=os.path.join(
-            dir_prefix, f"{case_name}/{severity}/d64_combined_features_dataset/"
+            dir_prefix, f"{case_name}/{severity}/d64_features_dataset/"
         ),
     )
 

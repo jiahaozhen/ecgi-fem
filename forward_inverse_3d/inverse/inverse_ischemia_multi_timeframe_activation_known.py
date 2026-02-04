@@ -6,11 +6,9 @@ from ufl import TestFunction, TrialFunction, dot, grad, Measure, derivative, sqr
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
-import multiprocessing
 from utils.error_metrics_tools import compute_error_phi
-from utils.helper_function import find_vertex_with_neighbour_less_than_0
+from utils.mesh_tools import find_vertex_with_neighbour_less_than_0
 from utils.simulate_tools import build_M, build_Mi
-from utils.visualize_tools import plot_loss_and_cm, plot_f_on_domain
 from utils.transmembrane_potential_tools import (
     G_tau,
     delta_tau,
@@ -39,7 +37,6 @@ def ischemia_inversion(
     phi_initial=None,
     total_iter=200,
     multi_flag=True,
-    plot_flag=False,
     print_message=False,
     transmural_flag=False,
 ):
@@ -249,7 +246,7 @@ def ischemia_inversion(
         return loss_residual, loss_reg
 
     loss_per_iter = []
-    cm_per_iter = []
+    cm_cmp_per_iter = []
     k = 0
     u_array = compute_u_from_phi_1(phi_1)
     while True:
@@ -257,7 +254,7 @@ def ischemia_inversion(
         loss = loss_residual + loss_reg
         loss_per_iter.append(loss)
         cm1 = compute_error_phi(phi_1.x.array, phi_1_exact[0], V2)
-        cm_per_iter.append(cm1)
+        cm_cmp_per_iter.append(cm1)
         J_p_array = compute_Jp_from_phi_1(phi_1, u_array)
 
         if print_message:
@@ -303,47 +300,20 @@ def ischemia_inversion(
                     u_array = compute_u_from_phi_1(phi_1)
                 break
 
-    if plot_flag == False:
-        return (
-            phi_1,
-            compute_loss_from_phi_1(phi_1, u_array)[0],
-            compute_loss_from_phi_1(phi_1, u_array)[1],
-        )
-
     marker_result = Function(V2)
     marker_result.x.array[:] = np.where(phi_1.x.array < 0, 1, 0)
 
     marker_exact = Function(V2)
     marker_exact.x.array[:] = np.where(phi_1_exact[0] < 0, 1, 0)
 
-    p1 = multiprocessing.Process(
-        target=plot_f_on_domain,
-        kwargs={
-            'domain': subdomain_ventricle,
-            'f': marker_result,
-            'title': 'ischemia_result',
-        },
-    )
-    p2 = multiprocessing.Process(
-        target=plot_f_on_domain,
-        kwargs={
-            'domain': subdomain_ventricle,
-            'f': marker_exact,
-            'title': 'ischemia_exact',
-        },
-    )
-    p3 = multiprocessing.Process(
-        target=plot_loss_and_cm, args=(loss_per_iter, cm_per_iter)
-    )
-    p1.start()
-    p2.start()
-    p3.start()
-    p1.join()
-    p2.join()
-    p3.join()
+    result_dict = {
+        'marker_result': marker_result,
+        'marker_exact': marker_exact,
+        'cm_cmp_per_iter': cm_cmp_per_iter,
+        'loss_per_iter': loss_per_iter,
+        'phi': phi_1,
+        'loss': compute_loss_from_phi_1(phi_1, u_array)[0],
+        'reg': compute_loss_from_phi_1(phi_1, u_array)[1],
+    }
 
-    return (
-        phi_1,
-        compute_loss_from_phi_1(phi_1, u_array)[0],
-        compute_loss_from_phi_1(phi_1, u_array)[1],
-    )
+    return result_dict

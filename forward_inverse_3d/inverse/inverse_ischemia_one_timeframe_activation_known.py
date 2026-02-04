@@ -9,7 +9,7 @@ import numpy as np
 import multiprocessing
 from utils.error_metrics_tools import compute_error_phi
 from utils.transmembrane_potential_tools import G_tau, delta_tau, delta_deri_tau
-from utils.helper_function import find_vertex_with_neighbour_less_than_0
+from utils.mesh_tools import find_vertex_with_neighbour_less_than_0
 from utils.simulate_tools import build_M, build_Mi
 from utils.visualize_tools import (
     plot_loss_and_cm,

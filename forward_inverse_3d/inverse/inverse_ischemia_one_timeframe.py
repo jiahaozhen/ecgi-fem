@@ -6,12 +6,10 @@ from ufl import TestFunction, TrialFunction, dot, grad, Measure, derivative, sqr
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
-import multiprocessing
 from utils.error_metrics_tools import compute_error
 from utils.transmembrane_potential_tools import delta_tau, delta_deri_tau
-from utils.helper_function import find_vertex_with_neighbour_less_than_0
+from utils.mesh_tools import find_vertex_with_neighbour_less_than_0
 from utils.simulate_tools import build_M, build_Mi
-from utils.visualize_tools import plot_f_on_domain, plot_loss_and_cm
 
 
 def ischemia_inversion(
@@ -29,7 +27,6 @@ def ischemia_inversion(
     phi_initial=None,
     total_iter=300,
     multi_flag=True,
-    plot_flag=False,
     print_message=False,
     transmural_flag=False,
 ):
@@ -255,40 +252,23 @@ def ischemia_inversion(
                     u.x.array[:] = u.x.array + adjustment
                 break
 
-    if not plot_flag:
-        return phi, assemble_scalar(form_loss), assemble_scalar(form_reg)
-
-    marker = Function(V2)
+    marker_result = Function(V2)
     marker_val = np.zeros(sub_node_num)
     marker_val[phi.x.array < 0] = 1
-    marker.x.array[:] = marker_val
+    marker_result.x.array[:] = marker_val
 
     marker_exact = Function(V2)
-    marker_exact.x.array[:] = np.where(v_exact.x.array == ischemia_potential, 1, 0)
+    marker_exact.x.array[:] = np.where(
+        np.abs(v_exact.x.array - ischemia_potential) < 1e-6, 1, 0
+    )
 
-    p1 = multiprocessing.Process(
-        target=plot_f_on_domain,
-        kwargs={
-            'domain': subdomain_ventricle,
-            'f': marker,
-            'title': 'Ischemia Result',
-        },
-    )
-    p2 = multiprocessing.Process(
-        target=plot_f_on_domain,
-        kwargs={
-            'domain': subdomain_ventricle,
-            'f': marker_exact,
-            'title': 'Ischemia Exact',
-        },
-    )
-    p3 = multiprocessing.Process(
-        target=plot_loss_and_cm, args=(loss_per_iter, cm_cmp_per_iter)
-    )
-    p1.start()
-    p2.start()
-    p3.start()
-    p1.join()
-    p2.join()
-    p3.join()
-    return phi, assemble_scalar(form_loss), assemble_scalar(form_reg)
+    result_dict = {
+        'marker_result': marker_result,
+        'marker_exact': marker_exact,
+        'cm_cmp_per_iter': cm_cmp_per_iter,
+        'loss_per_iter': loss_per_iter,
+        'phi': phi,
+        'loss': assemble_scalar(form_loss),
+        'reg': assemble_scalar(form_reg),
+    }
+    return result_dict

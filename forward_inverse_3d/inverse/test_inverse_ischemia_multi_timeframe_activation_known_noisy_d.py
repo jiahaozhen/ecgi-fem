@@ -3,6 +3,7 @@ from forward_inverse_3d.inverse.inverse_ischemia_multi_timeframe_activation_know
     ischemia_inversion,
 )
 from utils.error_metrics_tools import compute_error_with_marker
+from utils.helper_function import visualize_result_dict
 
 if __name__ == '__main__':
     case_index = 1
@@ -53,3 +54,5 @@ if __name__ == '__main__':
         print(f'Hausdorff Distance: {error_metric[1]}')
         print(f'SN false negative: {error_metric[2]}')
         print(f'SP false positive: {error_metric[3]}')
+
+        # visualize_result_dict(result_dict)

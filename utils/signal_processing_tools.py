@@ -156,6 +156,76 @@ def add_noise_based_on_snr(data: np.ndarray, snr: float) -> np.ndarray:
     return noisy_data
 
 
+def add_noise_based_on_relative_max_error(
+    data: np.ndarray, error_level: float
+) -> np.ndarray:
+    """
+    Add noise to the data such that:
+    max(|noise|) / (max(data) - min(data)) = error_level
+
+    Parameters:
+    - data: The original data.
+    - error_level: The desired relative maximum error.
+
+    Returns:
+    - Noisy data.
+    """
+    data_range = np.max(data) - np.min(data)
+    max_noise = error_level * data_range
+    noise = np.random.uniform(-max_noise, max_noise, size=data.shape)
+    return data + noise
+
+
+def add_noise_to_activation(
+    activation_time: np.ndarray,
+    snr: float = None,
+    error_level: float = None,
+    max_val: int = None,
+) -> np.ndarray:
+    """
+    Add noise to the activation time based on the specified SNR or relative max error.
+    And clip the value to [0, max_val].
+
+    Parameters:
+    - activation_time: The original activation time.
+    - snr: The desired SNR in decibels (dB). Used if provided.
+    - error_level: The desired relative maximum error. Used if snr is None.
+    - max_val: The maximum value for the activation time.
+
+    Returns:
+    - Noisy activation time.
+    """
+    if snr is not None:
+        activation_time_noisy = add_noise_based_on_snr(
+            activation_time,
+            snr=snr,
+        )
+    elif error_level is not None:
+        activation_time_noisy = add_noise_based_on_relative_max_error(
+            activation_time,
+            error_level=error_level,
+        )
+    else:
+        raise ValueError("Either snr or error_level must be provided")
+
+    activation_time_noisy = np.where(
+        activation_time_noisy < 0,
+        0,
+        activation_time_noisy,
+    )
+
+    if max_val is not None:
+        activation_time_noisy = np.where(
+            activation_time_noisy > max_val,
+            max_val,
+            activation_time_noisy,
+        )
+
+    activation_time_noisy = np.floor(activation_time_noisy).astype(int)
+
+    return activation_time_noisy
+
+
 def normalize_ecg_zscore(ecg: np.ndarray) -> np.ndarray:
     ecg = ecg.T
 

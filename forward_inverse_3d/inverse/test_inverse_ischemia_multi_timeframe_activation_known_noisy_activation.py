@@ -7,7 +7,10 @@ from forward_inverse_3d.inverse.inverse_ischemia_multi_timeframe_activation_know
     ischemia_inversion,
 )
 from utils.error_metrics_tools import compute_error_with_marker
-from utils.signal_processing_tools import add_noise_based_on_snr
+from utils.helper_function import visualize_result_dict
+from utils.signal_processing_tools import (
+    add_noise_to_activation,
+)
 from utils.transmembrane_potential_tools import (
     get_activation_time_from_v,
     compute_phi_with_activation,
@@ -38,30 +41,17 @@ if __name__ == '__main__':
     # activation inversion
     # time_sequence = np.arange(0, 1200, 60)
 
-    for noise_level in [10, 20, 30]:
+    for noise_level in [0.3, 0.2, 0.1]:
 
         print(
-            f'\n=== Inversion with noisy activation time, noise level: {noise_level}dB ===\n'
+            f'\n=== Inversion with noisy activation time, noise level: {noise_level} ===\n'
         )
 
-        activation_time_noisy = add_noise_based_on_snr(
+        activation_time_noisy = add_noise_to_activation(
             activation_time,
-            snr=noise_level,
+            error_level=noise_level,
+            max_val=v.shape[0] - 1,
         )
-
-        activation_time_noisy = np.where(
-            activation_time_noisy < 0,
-            0,
-            activation_time_noisy,
-        )
-
-        activation_time_noisy = np.where(
-            activation_time_noisy > v.shape[0] - 1,
-            v.shape[0] - 1,
-            activation_time_noisy,
-        )
-
-        activation_time_noisy = np.floor(activation_time_noisy).astype(int)
 
         phi_2_noisy = compute_phi_with_activation(
             activation_time_noisy,
@@ -91,3 +81,5 @@ if __name__ == '__main__':
         print(f'Hausdorff Distance: {error_metric[1]}')
         print(f'SN false negative: {error_metric[2]}')
         print(f'SP false positive: {error_metric[3]}')
+
+        # visualize_result_dict(result_dict)

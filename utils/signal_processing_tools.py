@@ -240,6 +240,8 @@ def project_bsp_on_surface(bsp_data, original_pts=load_bsp_pts(), length=50, wid
 
         surface_bsp[t] = grid_z
 
+    return surface_bsp
+
 
 def _get_fiducial_indices(signal, fs=1000):
     n = len(signal)

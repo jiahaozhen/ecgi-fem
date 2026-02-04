@@ -8,10 +8,7 @@ from dolfinx.plot import vtk_mesh
 from petsc4py import PETSc
 import numpy as np
 import pyvista
-from utils.helper_function import (
-    submesh_node_index,
-    compute_normal,
-)
+from utils.mesh_tools import submesh_node_index, compute_normal
 from utils.analytic_tool import (
     calculate_ue_gradients,
     calculate_ut_gradients,
@@ -156,45 +153,45 @@ def main():
     )
     print('u cc: ', np.corrcoef(u.x.array, u_exact.x.array)[0, 1])
 
-    # plot
-    plotter_v = pyvista.Plotter(shape=(1, 3))
+    # # plot
+    # plotter_v = pyvista.Plotter(shape=(1, 3))
 
-    plotter_v.subplot(0, 0)
-    grid_v_exact = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
-    v_exact_boundary = v_exact
-    mask = ~np.isin(np.arange(len(v_exact_boundary)), subboundary_index)
-    v_exact_boundary[mask] = v_exact_boundary[subboundary_index[0]]
-    grid_v_exact.point_data["v_exact"] = v_exact_boundary
-    grid_v_exact.set_active_scalars("v_exact")
-    plotter_v.add_mesh(grid_v_exact, show_edges=True)
-    plotter_v.view_xz()
-    plotter_v.add_axes()
-    plotter_v.add_title("transmembrane potential exact (v_exact)", font_size=9)
+    # plotter_v.subplot(0, 0)
+    # grid_v_exact = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
+    # v_exact_boundary = v_exact
+    # mask = ~np.isin(np.arange(len(v_exact_boundary)), subboundary_index)
+    # v_exact_boundary[mask] = v_exact_boundary[subboundary_index[0]]
+    # grid_v_exact.point_data["v_exact"] = v_exact_boundary
+    # grid_v_exact.set_active_scalars("v_exact")
+    # plotter_v.add_mesh(grid_v_exact, show_edges=True)
+    # plotter_v.view_xz()
+    # plotter_v.add_axes()
+    # plotter_v.add_title("transmembrane potential exact (v_exact)", font_size=9)
 
-    plotter_v.subplot(0, 1)
-    grid_v = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
-    v_boundary = eval_function(v, subdomain.geometry.x).squeeze()
-    mask = ~np.isin(np.arange(len(v_boundary)), subboundary_index)
-    v_boundary[mask] = v_boundary[subboundary_index[0]]
-    grid_v.point_data["v"] = v_boundary
-    grid_v.set_active_scalars("v")
-    plotter_v.add_mesh(grid_v, show_edges=True)
-    plotter_v.view_xz()
-    plotter_v.add_axes()
-    plotter_v.add_title("transmembrane potential (v)", font_size=9)
+    # plotter_v.subplot(0, 1)
+    # grid_v = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
+    # v_boundary = eval_function(v, subdomain.geometry.x).squeeze()
+    # mask = ~np.isin(np.arange(len(v_boundary)), subboundary_index)
+    # v_boundary[mask] = v_boundary[subboundary_index[0]]
+    # grid_v.point_data["v"] = v_boundary
+    # grid_v.set_active_scalars("v")
+    # plotter_v.add_mesh(grid_v, show_edges=True)
+    # plotter_v.view_xz()
+    # plotter_v.add_axes()
+    # plotter_v.add_title("transmembrane potential (v)", font_size=9)
 
-    plotter_v.subplot(0, 2)
-    grid_v_error = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
-    grid_v_error.point_data["v_error"] = v_boundary - v_exact_boundary
-    grid_v_error.set_active_scalars("v_error")
-    plotter_v.add_mesh(grid_v_error, show_edges=True)
-    plotter_v.view_xz()
-    plotter_v.add_axes()
-    plotter_v.add_title("transmembrane potential error (v_error)", font_size=9)
+    # plotter_v.subplot(0, 2)
+    # grid_v_error = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
+    # grid_v_error.point_data["v_error"] = v_boundary - v_exact_boundary
+    # grid_v_error.set_active_scalars("v_error")
+    # plotter_v.add_mesh(grid_v_error, show_edges=True)
+    # plotter_v.view_xz()
+    # plotter_v.add_axes()
+    # plotter_v.add_title("transmembrane potential error (v_error)", font_size=9)
 
-    plotter_v.show()
+    # plotter_v.show()
 
-    plotter = pyvista.Plotter(shape=(2, 2), off_screen=True)
+    plotter = pyvista.Plotter(shape=(2, 3), off_screen=True)
     plotter.subplot(0, 0)
     grid_ue_exact = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
     ue_exact_boundary = eval_function(u_exact, subdomain.geometry.x)
@@ -243,25 +240,25 @@ def main():
     plotter.add_axes()
     plotter.add_title("Torso potential (ut_numerical)", font_size=9)
 
-    # plotter.subplot(2, 0)
-    # grid_ue_error = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
-    # grid_ue_error.point_data["ue_error"] = ue_boundary - ue_exact_boundary
-    # grid_ue_error.set_active_scalars("ue_error")
-    # plotter.add_mesh(grid_ue_error, show_edges=True, scalar_bar_args = {"fmt": "%.3f"})
-    # plotter.view_xz()
-    # plotter.add_axes()
-    # plotter.add_title("Heart potential error (ue_error)", font_size=9)
+    plotter.subplot(0, 2)
+    grid_ue_error = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
+    grid_ue_error.point_data["ue_error"] = ue_boundary - ue_exact_boundary
+    grid_ue_error.set_active_scalars("ue_error")
+    plotter.add_mesh(grid_ue_error, show_edges=True, scalar_bar_args={"fmt": "%.3f"})
+    plotter.view_xz()
+    plotter.add_axes()
+    plotter.add_title("Heart potential error (ue_error)", font_size=9)
 
-    # plotter.subplot(2, 1)
-    # grid_ut_error = pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim))
-    # grid_ut_error.point_data["ut_error"] = ut_boundary - ut_exact_boundary
-    # grid_ut_error.set_active_scalars("ut_error")
-    # plotter.add_mesh(grid_ut_error, show_edges=True, scalar_bar_args = {"fmt": "%.3f"})
-    # plotter.view_xz()
-    # plotter.add_axes()
-    # plotter.add_title("Torso potential error (ut_error)", font_size=9)
-    plotter.window_size = [720, 720]
-    # plotter.screenshot("main_analytic_forward.png")
+    plotter.subplot(1, 2)
+    grid_ut_error = pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim))
+    grid_ut_error.point_data["ut_error"] = ut_boundary - ut_exact_boundary
+    grid_ut_error.set_active_scalars("ut_error")
+    plotter.add_mesh(grid_ut_error, show_edges=True, scalar_bar_args={"fmt": "%.3f"})
+    plotter.view_xz()
+    plotter.add_axes()
+    plotter.add_title("Torso potential error (ut_error)", font_size=9)
+    # plotter.window_size = [720, 720]
+    plotter.screenshot("thesis_drawing/figs/analytic_forward.png")
 
 
 if __name__ == '__main__':

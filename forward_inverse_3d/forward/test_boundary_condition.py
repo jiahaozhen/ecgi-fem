@@ -4,7 +4,7 @@ from dolfinx.mesh import create_submesh, locate_entities_boundary
 import numpy as np
 from mpi4py import MPI
 import scipy.io as sio
-from utils.helper_function import compute_grad, submesh_node_index, compute_normal
+from utils.mesh_tools import submesh_node_index, compute_normal, compute_grad
 
 
 def boundary_condition(u, v, cell_markers, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8):
@@ -93,8 +93,8 @@ def boundary_condition(u, v, cell_markers, sigma_i=0.4, sigma_e=0.8, sigma_t=0.8
 
 if __name__ == '__main__':
     file = r'forward_inverse_3d/data/mesh/mesh_normal_male.msh'
-    v_data = np.load(r'forward_inverse_3d/data/inverse/v_data_ischemia.npy')
-    u_data = np.load(r'forward_inverse_3d/data/inverse/u_data_ischemia.npy')
+    v_data = np.load(r'forward_inverse_3d/data/inverse/1/v_data_ischemia.npy')
+    u_data = np.load(r'forward_inverse_3d/data/inverse/1/u_data_ischemia.npy')
     if v_data.ndim == 1:
         v_data = v_data.reshape(1, -1)
     if u_data.ndim == 1:

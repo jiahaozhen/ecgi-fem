@@ -10,7 +10,11 @@ from dolfinx.io import gmshio
 from dolfinx.plot import vtk_mesh
 
 from .function_tools import eval_function
-from .signal_processing_tools import transfer_bsp_to_standard12lead, smooth_ecg_mean
+from .signal_processing_tools import (
+    transfer_bsp_to_standard12lead,
+    transfer_bsp_to_standard64lead,
+    smooth_ecg_mean,
+)
 
 
 def visualize_bullseye_points(theta, r, val):
@@ -259,8 +263,6 @@ def plot_standard_12_lead(
         else:
             ax.set_xlabel("")
 
-        # ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
-        # ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
         ax.grid(True)
 
     fig.suptitle("12-lead ECG", fontsize=16)
@@ -331,7 +333,18 @@ def plot_convergence(summary, base_lc=20, base_lc_ratio=1):
 
 
 def plot_triangle_mesh(
-    points, triangles, point_values=None, cell_values=None, title=None
+    points,
+    triangles,
+    point_values=None,
+    cell_values=None,
+    title=None,
+    extra_points=None,
+    color="lightgray",
+    point_color="red",
+    opacity=1.0,
+    show=True,
+    off_screen=False,
+    show_edges=True,
 ):
 
     points = np.asarray(points, dtype=float)
@@ -361,20 +374,36 @@ def plot_triangle_mesh(
         mesh.cell_data["cell_val"] = np.asarray(cell_values, dtype=float)
 
     # -------- 绘制 --------
-    p = pyvista.Plotter()
+    p = pyvista.Plotter(off_screen=off_screen)
 
     if point_values is not None:
-        p.add_mesh(mesh, scalars="point_val", show_edges=True)
+        p.add_mesh(mesh, scalars="point_val", show_edges=show_edges, opacity=opacity)
     elif cell_values is not None:
-        p.add_mesh(mesh, scalars="cell_val", show_edges=True)
+        p.add_mesh(mesh, scalars="cell_val", show_edges=show_edges, opacity=opacity)
     else:
-        p.add_mesh(mesh, show_edges=True, color="lightgray")
+        p.add_mesh(mesh, show_edges=show_edges, color=color, opacity=opacity)
+
+    if extra_points is not None:
+        ep = np.asarray(extra_points, dtype=float)
+        # 2D → 3D if needed
+        if ep.shape[1] == 2:
+            ep = np.c_[ep, np.zeros(ep.shape[0])]
+
+        p.add_points(
+            ep,
+            color=point_color,
+            point_size=10,
+            render_points_as_spheres=True,
+            label="Extra Points",
+        )
 
     if title is not None:
         p.add_title(title)
 
     p.add_axes()
-    p.show()
+    if show:
+        p.show()
+    return p
 
 
 def plot_activation_times_on_mesh(
@@ -420,6 +449,16 @@ def plot_loss_and_cm(loss_per_iter, cm_cmp_per_iter):
     plt.show()
 
 
+def plot_line(line, title="Loss Over Iterations", xlabel="Iteration", ylabel="Loss"):
+    plt.figure()
+    plt.plot(line)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(True)
+    plt.show()
+
+
 def plot_vals_on_mesh(
     mesh_file,
     val_2d,  # shape = (T, N)
@@ -431,6 +470,8 @@ def plot_vals_on_mesh(
     n_rows=3,
     n_cols=4,
     step_per_timeframe=4,
+    show=True,
+    off_screen=False,
 ):
     """
     自动选择合适时间间隔，绘制多个时刻。
@@ -464,7 +505,9 @@ def plot_vals_on_mesh(
     # print("Selected time indices:", selected_indices)  # Debug 可开启
 
     # ----------- 创建 plotter ------------
-    plotter = pyvista.Plotter(shape=(n_rows, n_cols), border=False)
+    plotter = pyvista.Plotter(
+        shape=(n_rows, n_cols), border=False, off_screen=off_screen
+    )
 
     # ---- 生成基准网格 ----
     grid_src = pyvista.UnstructuredGrid(*vtk_mesh(domain, domain.topology.dim))
@@ -487,12 +530,23 @@ def plot_vals_on_mesh(
         grid.point_data[name] = val
         grid.set_active_scalars(name)
 
-        plotter.add_mesh(grid, show_edges=True)
-        plotter.add_title(f"{title} (t={t/step_per_timeframe}s)", font_size=10)
+        plotter.add_mesh(
+            grid,
+            show_edges=True,
+            clim=[-90, 10],
+            scalar_bar_args={
+                'width': 0.6,
+                'height': 0.08,
+                'fmt': '%.0f',
+                'title': None,
+            },
+        )
+        plotter.add_title(f"{title} {t/step_per_timeframe}s", font_size=8)
         plotter.view_yz()
-        plotter.add_axes()
-
-    plotter.show(auto_close=False)
+        # plotter.add_axes()
+    if show:
+        plotter.show(auto_close=False)
+    return plotter
 
 
 def plot_val_on_surface(domain, val, function_space, title, tdim=3):
@@ -512,3 +566,38 @@ def plot_val_on_surface(domain, val, function_space, title, tdim=3):
     plotter.add_mesh(grid, show_edges=True)
     plotter.add_title(title)
     plotter.show()
+
+
+def compare_bsp_on_lead(
+    *bsp_data,
+    case_name='normal_male',
+    step_per_timeframe=4,
+    lead_idx=0,
+    labels=None,
+    title=None,
+    filter_flag=True,
+    filter_window_size=50,
+):
+    standard12Leads = [
+        transfer_bsp_to_standard64lead(bsp, case_name) for bsp in bsp_data
+    ]
+    if filter_flag:
+        standard12Leads = [
+            smooth_ecg_mean(data, window_size=filter_window_size)
+            for data in standard12Leads
+        ]
+    plt.figure(figsize=(8, 6))
+    time = np.arange(
+        0, standard12Leads[0].shape[0] / step_per_timeframe, 1 / step_per_timeframe
+    )
+    for idx, data in enumerate(standard12Leads):
+        label = labels[idx] if labels and idx < len(labels) else f"Data {idx + 1}"
+        linestyle = '-' if idx == 0 else '--'
+        plt.plot(time, data[:, lead_idx], linestyle=linestyle, label=label)
+    if title is not None:
+        plt.title(title)
+    plt.xlabel('Time (ms)')
+    plt.ylabel('Potential (mV)')
+    plt.legend()
+    plt.grid(True)
+    plt.show()

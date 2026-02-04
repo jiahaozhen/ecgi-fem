@@ -13,7 +13,7 @@ from dolfinx.plot import vtk_mesh
 import pyvista
 
 import numpy as np
-from utils.helper_function import compute_normal
+from utils.mesh_tools import compute_normal
 
 case_name_list = ['normal_male', 'normal_male2', 'normal_young_male']
 case_name = case_name_list[2]

@@ -4,7 +4,7 @@ from mpi4py import MPI
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .helper_function import submesh_node_index, get_boundary_vertex_connectivity
+from .mesh_tools import submesh_node_index, get_boundary_vertex_connectivity
 
 
 def distinguish_epi_endo(mesh_file: str, gdim: int) -> np.ndarray:

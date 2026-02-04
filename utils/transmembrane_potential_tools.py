@@ -25,7 +25,9 @@ def G_tau(s, tau):
     result = np.zeros_like(s)
     result[condition1] = 1
     result[condition2] = 0
-    result[condition3] = 0.5 * (1 + s[condition3] / tau + (1 / np.pi) * np.sin(np.pi * s[condition3] / tau))
+    result[condition3] = 0.5 * (
+        1 + s[condition3] / tau + (1 / np.pi) * np.sin(np.pi * s[condition3] / tau)
+    )
     return result
 
 
@@ -74,19 +76,21 @@ def min_distance(coords, mask):
     return dist
 
 
-def compute_phi_with_v(v: np.ndarray, marker_ischemia: np.ndarray, function_space: FunctionSpace):
+def compute_phi_with_v(
+    v: np.ndarray, marker_ischemia: np.ndarray, function_space: FunctionSpace
+):
     num_time, num_nodes = v.shape
     coords = function_space.tabulate_dof_coordinates()
 
     # ---- 1) preprocess ----
     activation_time = get_activation_time_from_v(v)
-    marker_ischemia = (marker_ischemia == 1)
+    marker_ischemia = marker_ischemia == 1
 
     # ---- 2) 直接向量化构造 marker_activation ----
     # shape: (num_time, num_nodes)
     marker_activation = np.less_equal(
-        activation_time[None, :],            # broadcast到时间维度
-        np.arange(num_time)[:, None]         # 每个 timeframe
+        activation_time[None, :],  # broadcast到时间维度
+        np.arange(num_time)[:, None],  # 每个 timeframe
     )
 
     # ---- 3) 预计算 ischemia 距离（无时间变化）----
@@ -127,32 +131,47 @@ def compute_phi_with_v(v: np.ndarray, marker_ischemia: np.ndarray, function_spac
     return phi_1, phi_2
 
 
-def v_data_augment(phi_1: np.ndarray, phi_2: np.ndarray, tau = 10, a1 = -90, a2 = -80, a3 = 10, a4 = 0):
+def v_data_augment(
+    phi_1: np.ndarray, phi_2: np.ndarray, tau=10, a1=-90, a2=-80, a3=10, a4=0
+):
     G_phi_1 = G_tau(phi_1, tau)
     G_phi_2 = G_tau(phi_2, tau)
-    v = ((a1 * G_phi_2 + a3 * (1 - G_phi_2)) * G_phi_1 + 
-         (a2 * G_phi_2 + a4 * (1 - G_phi_2)) * (1 - G_phi_1))
+    v = (a1 * G_phi_2 + a3 * (1 - G_phi_2)) * G_phi_1 + (
+        a2 * G_phi_2 + a4 * (1 - G_phi_2)
+    ) * (1 - G_phi_1)
     return v
 
 
-def compute_phi_with_activation(activation_f : Function, duration : int):
-    phi = np.zeros((duration, len(activation_f.x.array)))
-    activation_time = activation_f.x.array
-    marker_activation = np.full_like(phi, False, dtype=bool)
-    for i in range(phi.shape[1]):
-        marker_activation[int(activation_time[i]):, i] = True
-    coords = activation_f.function_space.tabulate_dof_coordinates()
-    
-    for timeframe in range(duration):
-        
-        min_act = min_distance(coords, marker_activation[timeframe])
-        min_no_act = min_distance(coords, ~marker_activation[timeframe])
-    
-        phi[timeframe] = np.where(marker_activation[timeframe], -min_no_act, min_act)
-        if (phi[timeframe] == 0).all():
-            if timeframe < np.min(activation_time) + 5:
-                phi[timeframe] = 20
+def compute_phi_with_activation(
+    activation_time: np.ndarray, num_time: int, function_space: FunctionSpace
+):
+    marker_activation = np.less_equal(
+        activation_time[None, :],  # broadcast到时间维度
+        np.arange(num_time)[:, None],  # 每个 timeframe
+    )
+
+    coords = function_space.tabulate_dof_coordinates()
+
+    phi_2 = np.zeros((num_time, len(activation_time)))
+
+    # 预先找最早激活时间
+    min_act_time = np.min(activation_time)
+
+    for t in range(num_time):
+        act_mask = marker_activation[t]
+
+        min_act = min_distance(coords, act_mask)
+        min_no_act = min_distance(coords, ~act_mask)
+
+        frame = np.where(act_mask, -min_no_act, min_act)
+
+        # 处理全部为 0 的情况
+        if np.all(frame == 0):
+            if t < min_act_time + 5:
+                frame[:] = 20
             else:
-                phi[timeframe] = -20
-    
-    return phi
+                frame[:] = -20
+
+        phi_2[t] = frame
+
+    return phi_2

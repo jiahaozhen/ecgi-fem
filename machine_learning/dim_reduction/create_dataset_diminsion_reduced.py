@@ -107,7 +107,7 @@ def collect_training_data(dirs, x_key="X"):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    method_name = "drpca"
+    method_name = "cnn128"
     dir_prefix = "machine_learning/data/Ischemia_Dataset/"
     case_name_list = ['normal_male', 'normal_male2']
     severities = ['mild', 'severe', 'healthy']
@@ -117,6 +117,8 @@ if __name__ == "__main__":
     if method_name == "cnn_ae":
         kwargs = {}
     elif method_name == "drpca":
+        kwargs = {}
+    elif method_name == "cnn128":
         kwargs = {}
 
     logging.info(f"初始化 {method_name} (kwargs={kwargs})...")

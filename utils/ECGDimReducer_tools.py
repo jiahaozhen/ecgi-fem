@@ -363,6 +363,184 @@ class CNNAutoEncoderReducer:
         return np.concatenate(feats, axis=0)
 
 
+class CNN128AutoEncoder(nn.Module):
+    """
+    1D CNN AutoEncoder treating ECG as a sequence of vectors.
+    Input: (B, D, T) -> Latent: (B, 128)
+    Processes temporal dimension with Conv1d, while mixing channel information.
+    """
+
+    def __init__(self, in_channels):
+        super().__init__()
+
+        # Encoder: (B, D, T) -> (B, 128)
+        self.encoder = nn.Sequential(
+            # (B, D, T)
+            nn.Conv1d(
+                in_channels, 32, kernel_size=5, stride=1, padding=2
+            ),  # (B, 32, T)
+            nn.BatchNorm1d(32),
+            nn.LeakyReLU(),
+            nn.MaxPool1d(2),  # (B, 32, T/2)
+            nn.Conv1d(32, 64, kernel_size=5, stride=1, padding=2),  # (B, 64, T/2)
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(),
+            nn.MaxPool1d(2),  # (B, 64, T/4)
+            nn.Conv1d(64, 128, kernel_size=3, stride=1, padding=1),  # (B, 128, T/4)
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(),
+            nn.MaxPool1d(2),  # (B, 128, T/8)
+            nn.Conv1d(128, 128, kernel_size=3, stride=1, padding=1),  # (B, 256, T/8)
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(),
+            nn.AdaptiveAvgPool1d(1),  # (B, 128, 1)
+        )
+
+        # Decoder: (B, 128 + 1, T/8) -> (B, D, T)
+        # Input channel increased by 1 for Positional Encoding
+        self.decoder = nn.Sequential(
+            nn.Conv1d(128 + 1, 64, kernel_size=3, padding=1),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(),
+            nn.Upsample(scale_factor=2, mode="linear", align_corners=False),
+            nn.Conv1d(64, 32, kernel_size=3, padding=1),
+            nn.BatchNorm1d(32),
+            nn.LeakyReLU(),
+            nn.Upsample(scale_factor=2, mode="linear", align_corners=False),
+            nn.Conv1d(32, 16, kernel_size=3, padding=1),
+            nn.BatchNorm1d(16),
+            nn.LeakyReLU(),
+            nn.Upsample(scale_factor=2, mode="linear", align_corners=False),
+            nn.Conv1d(16, in_channels, kernel_size=3, padding=1),
+        )
+
+    def forward(self, x):
+        """
+        x: (B, D, T)
+        """
+        B, D, T = x.shape
+        z_enc = self.encoder(x)  # (B, 128, 1)
+        z = z_enc.view(B, 128)
+
+        # Expand z
+        t_latent = max(1, T // 8)
+        z_expanded = z_enc.expand(-1, -1, t_latent)  # (B, 128, T//8)
+
+        # Add Positional Encoding (Linear Ramp from -1 to 1)
+        pos = torch.linspace(-1, 1, t_latent, device=x.device, dtype=x.dtype)
+        pos = pos.view(1, 1, t_latent).expand(B, -1, -1)  # (B, 1, T//8)
+
+        z_in = torch.cat([z_expanded, pos], dim=1)  # (B, 129, T//8)
+
+        x_rec = self.decoder(z_in)  # (B, D, T//8 * 8)
+
+        if x_rec.shape[-1] != T:
+            x_rec = nn.functional.interpolate(
+                x_rec, size=T, mode="linear", align_corners=False
+            )
+
+        return x_rec, z
+
+
+class CNN128Reducer:
+    def __init__(
+        self,
+        epochs=20,
+        batch_size=32,
+        lr=1e-3,
+        device=None,
+    ):
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.lr = lr
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = None
+        self.mean_ = None
+        self.std_ = None
+
+    def fit(self, X: np.ndarray):
+        """
+        X: (B, T, D)
+        """
+        B, T, D = X.shape
+
+        # Standardization: (X - mean) / std
+        # Compute mean/std over B and T for each channel D
+        # X shape (B, T, D). Reshape to (B*T, D)
+        X_reshaped = X.reshape(-1, D)
+        self.mean_ = X_reshaped.mean(axis=0)
+        self.std_ = X_reshaped.std(axis=0) + 1e-8
+
+        # Apply normalization
+        X_scaled = (X - self.mean_) / self.std_
+
+        # Input to model expects (B, D, T)
+        # Transpose X from (B, T, D) to (B, D, T)
+        X_tensor = torch.tensor(X_scaled.transpose(0, 2, 1), dtype=torch.float32)
+
+        self.model = CNN128AutoEncoder(in_channels=D).to(self.device)
+
+        optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        criterion = nn.MSELoss()
+
+        loader = DataLoader(
+            TensorDataset(X_tensor),
+            batch_size=self.batch_size,
+            shuffle=True,
+        )
+
+        self.model.train()
+        for epoch in range(self.epochs):
+            total_loss = 0.0
+            for (x_batch,) in loader:
+                x_batch = x_batch.to(self.device)
+
+                optimizer.zero_grad()
+                x_rec, _ = self.model(x_batch)
+                loss = criterion(x_rec, x_batch)
+                loss.backward()
+                optimizer.step()
+
+                total_loss += loss.item() * x_batch.size(0)
+
+            print(f"Epoch {epoch+1}/{self.epochs}, " f"Loss = {total_loss / B:.6f}")
+
+        self.model.eval()
+        return self
+
+    def transform(self, X: np.ndarray) -> np.ndarray:
+        """
+        Return encoded representation
+        Output: (B, 128)
+        """
+        if self.model is None:
+            raise RuntimeError("Call fit() first.")
+
+        # Apply normalization
+        # Handle cases where transform is called on data that might not be shape-compatible if fit was different?
+        # But assuming X matches (B, T, D)
+        X_scaled = (X - self.mean_) / self.std_
+
+        # (B, T, D) -> (B, D, T)
+        X_tensor = torch.tensor(X_scaled.transpose(0, 2, 1), dtype=torch.float32)
+
+        loader = DataLoader(
+            TensorDataset(X_tensor),
+            batch_size=self.batch_size,
+            shuffle=False,
+        )
+
+        feats = []
+        self.model.eval()
+        with torch.no_grad():
+            for (x_batch,) in loader:
+                x_batch = x_batch.to(self.device)
+                _, z = self.model(x_batch)
+                feats.append(z.cpu().numpy())  # (B, 128)
+
+        return np.concatenate(feats, axis=0)
+
+
 class DRPCAReducer(ECGReducerBase):
     """
     Dimensionality reduction using Smoothed Manifold Proximal Gradient (SMPG).
@@ -477,6 +655,7 @@ class ECGReducerFactory:
         "temporal_lead_pca": TimeLeadPCAReducer,
         "temporal_st_segment": TemporalSTSegmentReducer,
         "cnn_ae": CNNAutoEncoderReducer,
+        "cnn128": CNN128Reducer,
         "drpca": DRPCAReducer,
     }
 

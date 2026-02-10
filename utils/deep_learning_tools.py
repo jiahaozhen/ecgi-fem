@@ -1,11 +1,11 @@
 import os
+import glob
 import h5py
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import random_split, DataLoader, Dataset
 from sklearn.metrics import (
-    classification_report,
     hamming_loss,
     f1_score,
     accuracy_score,
@@ -26,6 +26,8 @@ class H5Dataset(Dataset):
         """
         if isinstance(data_dirs, str):
             data_dirs = [data_dirs]
+
+        data_dirs = [d for pattern in data_dirs for d in glob.glob(pattern)]
 
         # 收集所有 h5 文件
         self.data_files = []

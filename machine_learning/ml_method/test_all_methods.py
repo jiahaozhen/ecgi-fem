@@ -28,31 +28,11 @@ from utils.machine_learning_tools import (
 
 dataset_type = "features"
 # dataset_type = "processed"
+# dataset_type = 'cnn_ae'
+# dataset_type = 'cnn_ae_features'
 
-if dataset_type == "features":
-    data_dir = [
-        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_features_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_features_dataset/",
-    ]
-    model_save_dir = "machine_learning/data/model/features/ml_model"
-
-elif dataset_type == "processed":
-    data_dir = [
-        "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
-        "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
-    ]
-    model_save_dir = "machine_learning/data/model/processed/ml_model"
-
-else:
-    raise ValueError(f"Unknown dataset_type: {dataset_type}")
+data_dir = f"machine_learning/data/Ischemia_Dataset/*/*/d64_{dataset_type}_dataset/"
+model_save_dir = f"machine_learning/data/model/{dataset_type}/ml_model/"
 
 X, y, _ = load_dataset(data_dir)
 

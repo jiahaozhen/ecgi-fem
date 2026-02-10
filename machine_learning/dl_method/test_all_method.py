@@ -29,51 +29,10 @@ def test_all_classifiers():
     # dataset_type = "features"
     dataset_type = "processed"
     # dataset_type = "cnn_ae"
-    # dataset_type = "cnn_ae_feature_concat"
+    # dataset_type = "cnn_ae_feature"
 
-    if dataset_type == "features":
-        data_dir = [
-            "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_features_dataset/",
-        ]
-        model_save_dir = "machine_learning/data/model/features/dl_model"
-
-    elif dataset_type == "processed":
-        data_dir = [
-            "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_processed_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_processed_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_processed_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_processed_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_processed_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_processed_dataset/",
-        ]
-        model_save_dir = "machine_learning/data/model/processed/dl_model"
-    elif dataset_type == "cnn_ae":
-        data_dir = [
-            "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_cnn_ae_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_cnn_ae_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_cnn_ae_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_cnn_ae_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_cnn_ae_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_cnn_ae_dataset/",
-        ]
-        model_save_dir = "machine_learning/data/model/cnn_ae/dl_model"
-    elif dataset_type == "cnn_ae_feature_concat":
-        data_dir = [
-            "machine_learning/data/Ischemia_Dataset/normal_male/mild/d64_cnn_ae_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male/severe/d64_cnn_ae_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male/healthy/d64_cnn_ae_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/mild/d64_cnn_ae_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/severe/d64_cnn_ae_features_dataset/",
-            "machine_learning/data/Ischemia_Dataset/normal_male2/healthy/d64_cnn_ae_features_dataset/",
-        ]
-        model_save_dir = "machine_learning/data/model/all_concat/dl_model"
-    else:
-        raise ValueError(f"Unknown dataset_type: {dataset_type}")
+    data_dir = f"machine_learning/data/Ischemia_Dataset/*/*/d64_{dataset_type}_dataset/"
+    model_save_dir = f"machine_learning/data/model/{dataset_type}/dl_model/"
 
     # 🔥 使用你之前写好的随机划分函数
     train_loader, test_loader = build_train_test_loaders(

@@ -1,8 +1,8 @@
 import os
+import glob
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
-    classification_report,
     accuracy_score,
     f1_score,
     hamming_loss,
@@ -11,17 +11,16 @@ import h5py
 from joblib import dump, load
 
 
-def load_dataset(data_dir):
+def load_dataset(data_dir, meta_required=False):
     if isinstance(data_dir, str):
         data_dir = [data_dir]
 
     X_list, y_list = [], []
 
-    src_file_id_list = []
-    src_index_list = []
-    file_names = None
+    src_file_list = []
+    src_local_idx_list = []
 
-    has_meta = True  # 只要有一个 h5 缺字段，就整体判定没有 meta
+    data_dir = [d for pattern in data_dir for d in glob.glob(pattern)]
 
     for d in data_dir:
         assert os.path.isdir(d), f"{d} not found"
@@ -36,29 +35,19 @@ def load_dataset(data_dir):
                 X_list.append(f["X"][:])
                 y_list.append(f["y"][:])
 
-                # ===== 检查 meta 是否存在 =====
-                if "src_file_id" in f and "src_index" in f and "file_names" in f:
-                    src_file_id_list.append(f["src_file_id"][:])
-                    src_index_list.append(f["src_index"][:])
-
-                    if file_names is None:
-                        file_names = [
-                            n.decode() if isinstance(n, bytes) else str(n)
-                            for n in f["file_names"][:]
-                        ]
-                else:
-                    has_meta = False
+                if meta_required:
+                    src_file_list.extend([path] * len(f["y"]))
+                    src_local_idx_list.extend(np.arange(len(f["y"])))
 
     X = np.vstack(X_list)
     y = np.concatenate(y_list)
 
-    if not has_meta:
+    if not meta_required:
         return X, y, None
 
     meta = {
-        "src_file_id": np.concatenate(src_file_id_list),
-        "src_index": np.concatenate(src_index_list),
-        "file_names": file_names,
+        "file": src_file_list,
+        "sample_idx": src_local_idx_list,
     }
 
     return X, y, meta
@@ -80,12 +69,6 @@ def train_model(clf, X_train, y_train, save_path=None, load_path=None):
     return clf
 
 
-def flatten_data(data: np.ndarray):
-    if data.ndim == 3:
-        data = data.reshape(data.shape[0], -1)
-    return data
-
-
 def split_dataset(X, y, test_size=0.2, random_state=42):
     idx = np.arange(len(X))
     return train_test_split(
@@ -96,15 +79,6 @@ def split_dataset(X, y, test_size=0.2, random_state=42):
         random_state=random_state,
         shuffle=True,
     )
-
-
-def get_train_test(data_dir, test_size=0.2, random_state=42, test_only=False):
-    X, y = load_dataset(data_dir)
-    if test_only:
-        # 全部数据作为测试集
-        return None, X, None, y
-    else:
-        return split_dataset(X, y, test_size=test_size, random_state=random_state)
 
 
 def evaluate_model(clf, X_test, y_test, threshold=None):

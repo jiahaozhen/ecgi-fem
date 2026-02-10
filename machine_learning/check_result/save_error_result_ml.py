@@ -18,12 +18,40 @@ from utils.deep_learning_tools import save_wrong_samples
 
 if __name__ == "__main__":
 
-    data_dir = ["machine_learning/data/Ischemia_Dataset_DR_flatten/"]
+    dataset_type = "cnn_features"
+    # dataset_type = "features"
+    # dataset_type = "processed"
+    # dataset_type = "cnn128"
 
-    X, y, meta = load_dataset(data_dir)
-    assert meta is not None
+    if dataset_type == "cnn_features":
+        data_dir1 = f"machine_learning/data/Ischemia_Dataset/*/*/d64_features_dataset/"
+        data_dir2 = f"machine_learning/data/Ischemia_Dataset/*/*/d64_cnn128_dataset/"
+        X1, y1, meta = load_dataset(data_dir1, meta_required=True)
+        X2, y2, _ = load_dataset(data_dir2)
+        if X1.ndim == 3:
+            X1 = X1.reshape(X1.shape[0], -1)
+        if X2.ndim == 3:
+            X2 = X2.reshape(X2.shape[0], -1)
+        import numpy as np
+
+        X = np.concatenate([X1, X2], axis=1)
+        y = y1
+    else:
+        data_dir = (
+            f"machine_learning/data/Ischemia_Dataset/*/*/d64_{dataset_type}_dataset/"
+        )
+
+        X, y, meta = load_dataset(data_dir, meta_required=True)
+
+        if dataset_type == "processed":
+            X = X[:, 200:400, :]
+
+        if X.ndim == 3:
+            X = X.reshape(X.shape[0], -1)
 
     _, X_test, _, y_test, _, idx_test = split_dataset(X, y)
+
+    assert meta is not None, "Meta information is required for error analysis"
 
     methods = {
         'KNN': multilabel_knn_ovr_classifier,
@@ -36,7 +64,7 @@ if __name__ == "__main__":
 
     model_name = "XGB"
     model_func = methods[model_name]
-    model_path = f"machine_learning/data/model/ml_model/{model_func.__name__}.joblib"
+    model_path = f"machine_learning/data/model/{dataset_type}/ml_model/{model_func.__name__}.joblib"
     assert os.path.exists(model_path), f"Model not found: {model_path}"
 
     clf = model_func()
@@ -48,21 +76,17 @@ if __name__ == "__main__":
     wrong_indices = np.where(wrong_mask)[0]
     wrong_info = []
 
-    src_file_ids = meta['src_file_id']
-    src_indices = meta['src_index']
-    file_names = meta['file_names']
-
     wrong_info = [
         {
-            "file": file_names[src_file_ids[idx_test[i]]],
-            "sample_idx": src_indices[idx_test[i]],
+            "file": meta["file"][idx_test[i]],
+            "sample_idx": meta["sample_idx"][idx_test[i]],
             "y_true": y_test[i],
             "y_pred": y_pred[i],
         }
         for i in wrong_indices
     ]
 
-    error_samples_dir = "machine_learning/data/error_samples/ml"
+    error_samples_dir = f"machine_learning/data/error_samples/{dataset_type}/ml/"
 
     os.makedirs(error_samples_dir, exist_ok=True)
 

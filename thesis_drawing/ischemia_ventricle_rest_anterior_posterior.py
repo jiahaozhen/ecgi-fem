@@ -45,7 +45,12 @@ plotter = pyvista.Plotter(off_screen=True)
 grid = pyvista.UnstructuredGrid(*vtk_mesh(subdomain_ventricle, tdim))
 grid.point_data["v"] = eval_function(v, subdomain_ventricle.geometry.x)
 grid.set_active_scalars("v")
-plotter.add_mesh(grid, show_edges=True, scalars='v', scalar_bar_args={'vertical': True})
+plotter.add_mesh(
+    grid,
+    show_edges=True,
+    scalars='v',
+    scalar_bar_args={'vertical': True, "title": ""},
+)
 plotter.view_yz()
 # plotter.remove_scalar_bar()
 plotter.screenshot(f'thesis_drawing/figs/ischemia_ventricle_rest_anterior.png')

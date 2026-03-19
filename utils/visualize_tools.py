@@ -191,13 +191,12 @@ def compare_standard_12_lead(
             label = labels[idx] if labels and idx < len(labels) else f"Data {idx + 1}"
             linestyle = '-' if idx == 0 else '--'
             ax.plot(time, data[:, i], linestyle=linestyle, label=label)
-        ax.set_title(leads[i])
-        ax.set_xlabel('Time (ms)')
-        ax.set_ylabel('Potential (mV)')
-        ax.legend()
+        ax.set_title(leads[i], fontsize=14)
+        ax.set_xlabel('Time (ms)', fontsize=14)
+        ax.set_ylabel('Potential (mV)', fontsize=14)
         ax.grid(True)
 
-    fig.suptitle('Comparison of 12-lead ECG', fontsize=16)
+    # fig.suptitle('Comparison of 12-lead ECG', fontsize=14)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
@@ -249,23 +248,23 @@ def plot_standard_12_lead(
         col = idx % 3
 
         ax.plot(time, standard12Lead[:, idx])
-        ax.set_title(leads[idx])
+        ax.set_title(leads[idx], fontsize=14)
 
         # y label only at the first column
         if col == 0:
-            ax.set_ylabel("Potential (mV)")
+            ax.set_ylabel("Potential (mV)", fontsize=14)
         else:
-            ax.set_ylabel("")
+            ax.set_ylabel("", fontsize=14)
 
         # x label only at the bottom row
         if row == 3:
-            ax.set_xlabel("Time (ms)")
+            ax.set_xlabel("Time (ms)", fontsize=14)
         else:
-            ax.set_xlabel("")
+            ax.set_xlabel("", fontsize=14)
 
         ax.grid(True)
 
-    fig.suptitle("12-lead ECG", fontsize=16)
+    # fig.suptitle("12-lead ECG", fontsize=16)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
@@ -449,12 +448,14 @@ def plot_loss_and_cm(loss_per_iter, cm_cmp_per_iter):
     plt.show()
 
 
-def plot_line(line, title="Loss Over Iterations", xlabel="Iteration", ylabel="Loss"):
+def plot_line(line, title="", xlabel="Iteration", ylabel="Loss"):
     plt.figure()
     plt.plot(line)
     plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    plt.xlabel(xlabel, fontsize=14)
+    plt.ylabel(ylabel, fontsize=14)
+    plt.tick_params(axis='both', labelsize=14)
+
     plt.grid(True)
     plt.show()
 
@@ -541,7 +542,7 @@ def plot_vals_on_mesh(
                 'title': None,
             },
         )
-        plotter.add_title(f"{title} {t/step_per_timeframe}s", font_size=8)
+        plotter.add_title(f"{title} {int(t/step_per_timeframe)} s", font_size=8)
         plotter.view_yz()
         # plotter.add_axes()
     if show:

@@ -35,4 +35,4 @@ plotter = plot_vals_on_mesh(
     off_screen=True,
 )
 
-plotter.screenshot("thesis_drawing/figs/activation_seq.png")
+plotter.screenshot("thesis_drawing/figs/ischemia_ventricle_activation_sequence.png")

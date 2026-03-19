@@ -16,7 +16,7 @@ def visualize_result_dict(result_dict):
         kwargs={
             'domain': marker_result.function_space.mesh,
             'f': marker_result,
-            'title': 'Ischemia Result',
+            # 'title': 'Ischemia Result',
         },
     )
 
@@ -25,7 +25,7 @@ def visualize_result_dict(result_dict):
         kwargs={
             'domain': marker_exact.function_space.mesh,
             'f': marker_exact,
-            'title': 'Ischemia Exact',
+            # 'title': 'Ischemia Exact',
         },
     )
 
@@ -33,7 +33,7 @@ def visualize_result_dict(result_dict):
         target=plot_line,
         kwargs={
             'line': result_dict['cm_cmp_per_iter'],
-            'title': 'Center of Mass Error Over Iterations',
+            # 'title': 'Center of Mass Error Over Iterations',
             'xlabel': 'Iteration',
             'ylabel': 'Center of Mass Error',
         },
@@ -43,7 +43,7 @@ def visualize_result_dict(result_dict):
         target=plot_line,
         kwargs={
             'line': result_dict['loss_per_iter'],
-            'title': 'Loss Over Iterations',
+            # 'title': 'Loss Over Iterations',
             'xlabel': 'Iteration',
             'ylabel': 'Loss',
         },

@@ -6,20 +6,26 @@ from utils.signal_processing_tools import extract_features, _get_fiducial_indice
 from scipy.ndimage import gaussian_filter1d
 
 
-def plot_consistency(data, fs, fiducials=None, filename='temp/feature_consistency.png'):
+def plot_consistency(
+    data, fs, fiducials=None, filename='thesis_drawing/figs/global_reference_points.png'
+):
     N, n_leads = data.shape
     t = np.arange(N) / fs
+    fontsize = 14
+    fig_width = 12
+    left_margin = 0.15
+    right_margin = 0.98
 
-    fig, axes = plt.subplots(2, 1, figsize=(12, 10))
+    # Figure 1: RMS signal and global fiducials
+    fig0, ax0 = plt.subplots(figsize=(fig_width, 5))
 
     # Plot 1: RMS Signal and Fiducials
     data_clean = gaussian_filter1d(data.astype(float), sigma=2.0, axis=0)
     rms_signal = np.sqrt(np.mean(data_clean**2, axis=1))
 
-    ax0 = axes[0]
     ax0.plot(t, rms_signal, 'k-', linewidth=2, label='Global RMS')
-    ax0.set_title('Global RMS Signal & Detected Fiducials')
-    ax0.set_ylabel('Amplitude')
+    ax0.set_xlabel('Time (s)', fontsize=fontsize)
+    ax0.set_ylabel(r'$d_{\mathrm{RMS}}$', fontsize=fontsize)
 
     if fiducials:
         # Mark fiducials
@@ -44,31 +50,44 @@ def plot_consistency(data, fs, fiducials=None, filename='temp/feature_consistenc
         if st_end_t > j_t:
             ax0.axvspan(j_t, st_end_t, color='cyan', alpha=0.3, label='ST Segment')
 
-    ax0.legend()
+    ax0.tick_params(axis='both', labelsize=fontsize)
+    ax0.legend(fontsize=fontsize)
 
-    # Plot 2: All Leads with Global Fiducials
-    ax1 = axes[1]
+    # Figure 2: All leads with global fiducials
+    fig1, ax1 = plt.subplots(figsize=(fig_width, 8))
     offset = 0
-    for i in range(n_leads):
+    n_show_leads = min(n_leads, 10)
+    y_ticks = []
+    y_labels = []
+    for i in range(n_show_leads):
         # Normalize for display
         sig = data[:, i]
         sig_norm = (sig - np.mean(sig)) / (np.std(sig) + 1e-6)
         ax1.plot(t, sig_norm + offset, label=f'Lead {i+1}')
+        y_ticks.append(offset)
+        y_labels.append(f'Lead {i+1}')
         offset += 5  # Stack signals
 
-    ax1.set_title(f'All {n_leads} Leads with APPLIED Global Windows')
-    ax1.set_yticks([])
-    ax1.set_xlabel('Time (s)')
+    ax1.set_xlabel('Time (s)', fontsize=fontsize)
+    # ax1.set_ylabel('Lead', fontsize=fontsize)
+    ax1.set_yticks(y_ticks)
+    ax1.set_yticklabels(y_labels, fontsize=fontsize)
+    ax1.tick_params(axis='x', labelsize=fontsize)
 
     # Draw the same fiducial lines across all leads
     if fiducials:
         for boundary in [fiducials['t_onset'] / fs, fiducials['t_offset'] / fs]:
-            ax1.axvline(boundary, color='orange', linestyle='-', alpha=0.5, linewidth=2)
+            ax1.axvline(boundary, color='yellow', linestyle='-', alpha=0.5, linewidth=2)
 
-        j_t = (fiducials['s_idx'] / fs) + 0.04
-        ax1.axvline(j_t, color='cyan', linestyle=':', linewidth=2)
+        st_on = (fiducials['s_idx'] / fs) + 0.04
+        st_offset = min(st_on + 0.08, fiducials['t_idx'] / fs)
 
-    plt.tight_layout()
+        # ST segment markers use cyan to match Figure 1.
+        ax1.axvline(st_on, color='cyan', linestyle='--', linewidth=2)
+        ax1.axvline(st_offset, color='cyan', linestyle=':', linewidth=2)
+
+    fig0.subplots_adjust(left=left_margin, right=right_margin)
+    fig1.subplots_adjust(left=left_margin, right=right_margin)
     plt.show()
     print(f"Plot saved to {filename}")
 

@@ -52,6 +52,13 @@ if __name__ == "__main__":
 
     _, X_test, _, y_test, _, idx_test = split_dataset(X, y, random_state=42)
 
+    assert meta is not None, "Meta information is required to identify typical samples"
+
+    test_typical_idx = [idx for idx in idx_test if "severe" in meta["file"][idx]]
+
+    X_test = X[test_typical_idx]
+    y_test = y[test_typical_idx]
+
     methods = {
         'ML-KNN': multilabel_ml_knn_classifier,
         'Classifier Chain': classifier_chain_classifier,

@@ -58,11 +58,8 @@ methods = [
     # ('ML-KNN', multilabel_ml_knn_classifier),
     # ('Classifier Chain', classifier_chain_classifier),
     # ('Calibrated Label Ranking', calibrated_label_ranking_classifier),
-    # ('Random k-Labelsets', random_k_labelsets_classifier),
-    # ('Multi-Lablel Decision Tree', multilabel_decision_tree_classifier),
     ('Binary Relevance-XGB', multilabel_xgb_classifier),
     # ('Binary Relevance-Random Forest', multilabel_rf_classifier),
-    # ('Label Powerset', label_powerset_classifier),
 ]
 
 results = {}

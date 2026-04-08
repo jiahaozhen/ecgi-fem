@@ -63,7 +63,7 @@ def plot_consistency(
         # Normalize for display
         sig = data[:, i]
         sig_norm = (sig - np.mean(sig)) / (np.std(sig) + 1e-6)
-        ax1.plot(t, sig_norm + offset, label=f'Lead {i+1}')
+        ax1.plot(t, sig_norm + offset, color='k', label=f'Lead {i+1}')
         y_ticks.append(offset)
         y_labels.append(f'Lead {i+1}')
         offset += 5  # Stack signals

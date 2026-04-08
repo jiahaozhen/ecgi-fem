@@ -23,13 +23,13 @@ def visualize_bullseye_points(theta, r, val):
     ax.set_ylim(0, 1)
     ax.set_theta_direction(-1)
     ax.set_theta_zero_location("N")
-    sc = ax.scatter(np.radians(theta), r, c=val, cmap='tab20', s=5)
-    plt.title("LV Points mapped to AHA Bullseye", fontsize=14)
-    plt.colorbar(sc, label="Segment ID")
+    ax.scatter(np.radians(theta), r, c=val, cmap='tab20', s=5)
+    ax.set_xticks([])
+    ax.set_yticks([])
     plt.show()
 
 
-def visualize_bullseye_segment(values):
+def visualize_bullseye_segment(values, title):
     """
     可视化 AHA 17 段 bullseye 图
     values: 长度为17的数组, 对应17个分区的值
@@ -39,37 +39,53 @@ def visualize_bullseye_segment(values):
     # 17段映射
     # basal: 6段, mid: 6段, apical: 4段, apex: 1段
     segments = [
-        {'start': 0, 'end': 6, 'radius': [0.66, 1.0]},  # basal
-        {'start': 6, 'end': 12, 'radius': [0.33, 0.66]},  # mid
-        {'start': 12, 'end': 16, 'radius': [0.1, 0.33]},  # apical
-        {'start': 16, 'end': 17, 'radius': [0.0, 0.1]},  # apex中心点
+        # 对 6 分段和 4 分段环分别做角度偏移，使第一个分段位于正上方
+        {'start': 0, 'end': 6, 'radius': [0.66, 1.0], 'theta_offset': -np.pi / 6},
+        {'start': 6, 'end': 12, 'radius': [0.33, 0.66], 'theta_offset': -np.pi / 6},
+        {'start': 12, 'end': 16, 'radius': [0.1, 0.33], 'theta_offset': -np.pi / 4},
+        {'start': 16, 'end': 17, 'radius': [0.0, 0.1], 'theta_offset': 0.0},
     ]
 
     fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={'projection': 'polar'})
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
     ax.set_ylim(0, 1)
+    ax.set_xticks([])
+    ax.set_yticks([])
 
     cmap = get_cmap('viridis')
     norm = Normalize(vmin=min(values), vmax=max(values))
+    lighten_factor = 0.35
 
     for seg in segments:
         start, end = seg['start'], seg['end']
         r_inner, r_outer = seg['radius']
+        theta_offset = seg['theta_offset']
         n = end - start
+        is_center = n == 1
         for i in range(n):
-            theta_start = 2 * np.pi * i / n
-            theta_end = 2 * np.pi * (i + 1) / n
-            color = cmap(norm(values[start + i]))
+            theta_start = theta_offset + 2 * np.pi * i / n
+            theta_end = theta_offset + 2 * np.pi * (i + 1) / n
+            base_color = np.array(cmap(norm(values[start + i])))
+            # 与白色做线性混合，让同心圆配色更浅但保留数值梯度
+            color = tuple(base_color * (1.0 - lighten_factor) + lighten_factor)
             ax.bar(
                 x=(theta_start + theta_end) / 2,
                 height=r_outer - r_inner,
                 width=(theta_end - theta_start),
                 bottom=r_inner,
                 color=color,
-                edgecolor='white',
+                edgecolor='none' if is_center else 'black',
+                linewidth=0.0 if is_center else 1.2,
                 align='center',
             )
+
+        if is_center:
+            # 中心圆单独补一圈边界，避免极坐标扇形接缝线，同时保持线宽一致
+            theta = np.linspace(0.0, 2.0 * np.pi, 361)
+            ax.plot(theta, np.full_like(theta, r_outer), color='black', linewidth=1.2)
+
+    # ax.set_title(title)
 
     plt.show()
 
@@ -531,18 +547,31 @@ def plot_vals_on_mesh(
         grid.point_data[name] = val
         grid.set_active_scalars(name)
 
+        scalar_bar_args = None
+        show_scalar_bar = i == 0
+        if show_scalar_bar:
+            scalar_bar_args = {
+                'vertical': True,
+                'width': 0.08,
+                'height': 0.42,
+                'position_x': 0.04,
+                'position_y': 0.52,
+                'fmt': '%.0f',
+                'title': None,
+            }
+
         plotter.add_mesh(
             grid,
             show_edges=True,
             clim=[-90, 10],
-            scalar_bar_args={
-                'width': 0.6,
-                'height': 0.08,
-                'fmt': '%.0f',
-                'title': None,
-            },
+            show_scalar_bar=show_scalar_bar,
+            scalar_bar_args=scalar_bar_args,
         )
-        plotter.add_title(f"{title} {int(t/step_per_timeframe)} s", font_size=8)
+        plotter.add_text(
+            f"{title} {int(t/step_per_timeframe)} s",
+            position='lower_edge',
+            font_size=8,
+        )
         plotter.view_yz()
         # plotter.add_axes()
     if show:

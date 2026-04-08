@@ -1,17 +1,11 @@
 import time
 from machine_learning.ml_method.ml_knn_method import multilabel_ml_knn_classifier
 from machine_learning.ml_method.ml_classifier_chain import classifier_chain_classifier
-from machine_learning.ml_method.ml_label_powerset import label_powerset_classifier
 from machine_learning.ml_method.xgb_method import multilabel_xgb_classifier
 from machine_learning.ml_method.random_forest import multilabel_rf_classifier
 from machine_learning.ml_method.calibrated_label_ranking import (
     calibrated_label_ranking_classifier,
 )
-from machine_learning.ml_method.random_k_labelsets import random_k_labelsets_classifier
-from machine_learning.ml_method.ml_decision_tree import (
-    multilabel_decision_tree_classifier,
-)
-
 from utils.machine_learning_tools import (
     load_dataset,
     split_dataset,
@@ -65,14 +59,11 @@ X_test_typical = X[test_typical_idx]
 y_test_typical = y[test_typical_idx]
 
 methods = [
-    # ('ML-KNN', multilabel_ml_knn_classifier),
+    ('ML-KNN', multilabel_ml_knn_classifier),
     ('Classifier Chain', classifier_chain_classifier),
-    # ('Calibrated Label Ranking', calibrated_label_ranking_classifier),
-    # ('Random k-Labelsets', random_k_labelsets_classifier),
-    # ('Multi-Lablel Decision Tree', multilabel_decision_tree_classifier),
+    ('Calibrated Label Ranking', calibrated_label_ranking_classifier),
     ('Binary Relevance-XGB', multilabel_xgb_classifier),
     ('Binary Relevance-Random Forest', multilabel_rf_classifier),
-    # ('Label Powerset', label_powerset_classifier),
 ]
 
 results = {}

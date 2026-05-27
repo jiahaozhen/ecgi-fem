@@ -191,14 +191,10 @@ def main():
 
     # plotter_v.show()
 
-    plotter = pyvista.Plotter(shape=(2, 3), off_screen=True, border=False)
-    plotter.subplot(0, 0)
-    grid_ue_exact = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
+    # save six separate figures (one per plot) instead of a single combined window
     ue_exact_boundary = eval_function(u_exact, subdomain.geometry.x)
     mask = ~np.isin(np.arange(len(ue_exact_boundary)), subboundary_index)
     ue_exact_boundary[mask] = ue_exact_boundary[subboundary_index[0]]
-    grid_ue_exact.point_data["ue_exact"] = ue_exact_boundary
-    grid_ue_exact.set_active_scalars("ue_exact")
 
     ut_exact_boundary = eval_function(u_exact, domain.geometry.x)
     mask = ~np.isin(np.arange(len(ut_exact_boundary)), boundary_index)
@@ -215,76 +211,67 @@ def main():
     ue_error = ue_boundary - ue_exact_boundary
     ut_error = ut_boundary - ut_exact_boundary
 
-    plotter.add_mesh(
-        grid_ue_exact,
-        show_edges=True,
-        scalar_bar_args={"fmt": "%.3f", "title": " ", "n_labels": 4},
-    )
-    plotter.view_xz()
-    plotter.add_title("ue_exact", font_size=9)
+    plots = [
+        (
+            pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim)),
+            "ue_exact",
+            ue_exact_boundary,
+            "ue_exact",
+        ),
+        (
+            pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim)),
+            "ut_exact",
+            ut_exact_boundary,
+            "ut_exact",
+        ),
+        (
+            pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim)),
+            "ue",
+            ue_boundary,
+            "ue_numerical",
+        ),
+        (
+            pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim)),
+            "ut",
+            ut_boundary,
+            "ut_numerical",
+        ),
+        (
+            pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim)),
+            "ue_error",
+            ue_error,
+            "ue_error",
+        ),
+        (
+            pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim)),
+            "ut_error",
+            ut_error,
+            "ut_error",
+        ),
+    ]
 
-    plotter.subplot(1, 0)
-    grid_ut_exact = pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim))
-    grid_ut_exact.point_data["ut_exact"] = ut_exact_boundary
-    grid_ut_exact.set_active_scalars("ut_exact")
-    plotter.add_mesh(
-        grid_ut_exact,
-        show_edges=True,
-        scalar_bar_args={"fmt": "%.3f", "title": "  ", "n_labels": 4},
-    )
-    plotter.view_xz()
-    plotter.add_title("ut_exact", font_size=9)
-
-    plotter.subplot(0, 1)
-    grid_ue = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
-    grid_ue.point_data["ue"] = ue_boundary
-    grid_ue.set_active_scalars("ue")
-    plotter.add_mesh(
-        grid_ue,
-        show_edges=True,
-        scalar_bar_args={"fmt": "%.3f", "title": "   ", "n_labels": 4},
-    )
-    plotter.view_xz()
-    plotter.add_title("ue_numerical", font_size=9)
-
-    plotter.subplot(1, 1)
-    grid_ut = pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim))
-    grid_ut.point_data["ut"] = ut_boundary
-    grid_ut.set_active_scalars("ut")
-    plotter.add_mesh(
-        grid_ut,
-        show_edges=True,
-        scalar_bar_args={"fmt": "%.3f", "title": "    ", "n_labels": 4},
-    )
-    plotter.view_xz()
-    plotter.add_title("ut_numerical", font_size=9)
-
-    plotter.subplot(0, 2)
-    grid_ue_error = pyvista.UnstructuredGrid(*vtk_mesh(subdomain, tdim))
-    grid_ue_error.point_data["ue_error"] = ue_error
-    grid_ue_error.set_active_scalars("ue_error")
-    plotter.add_mesh(
-        grid_ue_error,
-        show_edges=True,
-        scalar_bar_args={"fmt": "%.3f", "title": "     ", "n_labels": 4},
-    )
-    plotter.view_xz()
-    plotter.add_title("ue_error", font_size=9)
-
-    plotter.subplot(1, 2)
-    grid_ut_error = pyvista.UnstructuredGrid(*vtk_mesh(domain, tdim))
-    grid_ut_error.point_data["ut_error"] = ut_error
-    grid_ut_error.set_active_scalars("ut_error")
-    plotter.add_mesh(
-        grid_ut_error,
-        show_edges=True,
-        scalar_bar_args={"fmt": "%.3f", "title": "      ", "n_labels": 4},
-    )
-    plotter.view_xz()
-    plotter.add_title("ut_error", font_size=9)
-    # plotter.window_size = [720, 720]
-    plotter.show()
-    plotter.screenshot('analytic_forward_error.png')
+    for idx, (grid, key, data, title) in enumerate(plots, start=1):
+        grid.point_data[key] = data
+        grid.set_active_scalars(key)
+        p = pyvista.Plotter(off_screen=True)
+        is_error_plot = "error" in key
+        p.add_mesh(
+            grid,
+            show_edges=True,
+            scalar_bar_args={
+                "fmt": "%.2e" if is_error_plot else "%.3f",
+                "title": "",
+                "n_labels": 4,
+                "label_font_size": 28,
+                "title_font_size": 28,
+            },
+        )
+        p.view_xz()
+        # p.add_axes()
+        # p.add_title(title, font_size=9)
+        filename = f"analytic_forward_{title}.png"
+        p.screenshot(filename)
+        p.close()
 
 
 if __name__ == '__main__':

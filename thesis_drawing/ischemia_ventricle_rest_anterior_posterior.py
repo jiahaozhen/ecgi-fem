@@ -44,12 +44,12 @@ v.x.array[:] = v_val[0]
 plotter = pyvista.Plotter(off_screen=True)
 grid = pyvista.UnstructuredGrid(*vtk_mesh(subdomain_ventricle, tdim))
 grid.point_data["v"] = eval_function(v, subdomain_ventricle.geometry.x)
-grid.set_active_scalars("v")
+# grid.set_active_scalars("v")
 plotter.add_mesh(
     grid,
     show_edges=True,
     scalars='v',
-    scalar_bar_args={'vertical': True, "title": ""},
+    show_scalar_bar=False,
 )
 plotter.view_yz()
 # plotter.remove_scalar_bar()
